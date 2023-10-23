@@ -26,6 +26,7 @@ java_sdk_library {
      ],
     defaults: ["framework-module-defaults"],
     sdk_version: "module_current",
+    min_sdk_version: "VanillaIceCream",
     impl_library_visibility: [
             "//packages/modules/CrashRecovery:__subpackages__"
     ],
