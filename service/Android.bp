@@ -29,6 +29,7 @@ java_sdk_library {
         "com.android.crashrecovery",
     ],
     sdk_version: "module_current",
+    min_sdk_version: "VanillaIceCream",
     impl_library_visibility: [
             "//packages/modules/CrashRecovery:__subpackages__"
     ],
