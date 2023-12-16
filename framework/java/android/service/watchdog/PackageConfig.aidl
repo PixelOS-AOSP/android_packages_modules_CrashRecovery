@@ -16,16 +16,7 @@
 
 package android.service.watchdog;
 
-import android.os.RemoteCallback;
-
 /**
  * @hide
  */
-oneway interface IExplicitHealthCheckService
-{
-    void setCallback(in @nullable RemoteCallback callback);
-    void request(String packageName);
-    void cancel(String packageName);
-    void getSupportedPackages(in RemoteCallback callback);
-    void getRequestedPackages(in RemoteCallback callback);
-}
+parcelable PackageConfig;
