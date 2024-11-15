@@ -45,7 +45,6 @@ package com.android.server.rollback {
     method public boolean onExecuteBootLoopMitigation(int);
     method public boolean onExecuteHealthCheckMitigation(@Nullable android.content.pm.VersionedPackage, int, int);
     method public int onHealthCheckFailed(@Nullable android.content.pm.VersionedPackage, int, int);
-    method @AnyThread @NonNull public void startObservingHealth(@NonNull java.util.List<java.lang.String>, @NonNull long);
   }
 
 }
