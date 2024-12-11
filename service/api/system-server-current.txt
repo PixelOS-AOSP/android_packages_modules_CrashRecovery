@@ -15,6 +15,11 @@ package com.android.server {
     field public static final int FAILURE_REASON_EXPLICIT_HEALTH_CHECK = 2; // 0x2
     field public static final int FAILURE_REASON_NATIVE_CRASH = 1; // 0x1
     field public static final int FAILURE_REASON_UNKNOWN = 0; // 0x0
+    field public static final int MITIGATION_RESULT_FAILURE_NON_RETRYABLE = 4; // 0x4
+    field public static final int MITIGATION_RESULT_FAILURE_RETRYABLE = 3; // 0x3
+    field public static final int MITIGATION_RESULT_SKIPPED = 2; // 0x2
+    field public static final int MITIGATION_RESULT_SUCCESS = 1; // 0x1
+    field public static final int MITIGATION_RESULT_UNKNOWN = 0; // 0x0
     field public static final int USER_IMPACT_THRESHOLD_HIGH = 71; // 0x47
     field public static final int USER_IMPACT_THRESHOLD_MEDIUM = 20; // 0x14
     field public static final int USER_IMPACT_THRESHOLD_NONE = 0; // 0x0
@@ -25,8 +30,8 @@ package com.android.server {
     method public default boolean isPersistent();
     method public default boolean mayObservePackage(@NonNull String);
     method public default int onBootLoop(int);
-    method public default boolean onExecuteBootLoopMitigation(int);
-    method public boolean onExecuteHealthCheckMitigation(@Nullable android.content.pm.VersionedPackage, int, int);
+    method public default int onExecuteBootLoopMitigation(int);
+    method public int onExecuteHealthCheckMitigation(@Nullable android.content.pm.VersionedPackage, int, int);
     method public int onHealthCheckFailed(@Nullable android.content.pm.VersionedPackage, int, int);
   }
 
@@ -42,8 +47,8 @@ package com.android.server.rollback {
     method @AnyThread @NonNull public void notifyRollbackAvailable(@NonNull android.content.rollback.RollbackInfo);
     method @AnyThread public void onBootCompletedAsync();
     method public int onBootLoop(int);
-    method public boolean onExecuteBootLoopMitigation(int);
-    method public boolean onExecuteHealthCheckMitigation(@Nullable android.content.pm.VersionedPackage, int, int);
+    method public int onExecuteBootLoopMitigation(int);
+    method public int onExecuteHealthCheckMitigation(@Nullable android.content.pm.VersionedPackage, int, int);
     method public int onHealthCheckFailed(@Nullable android.content.pm.VersionedPackage, int, int);
   }
 
