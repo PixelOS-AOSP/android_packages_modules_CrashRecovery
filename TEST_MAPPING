@@ -1,0 +1,13 @@
+{
+  "crashrecovery-mainline-presubmit": [
+    {
+      "name": "CtsPackageWatchdogTestCases"
+    },
+    {
+      "name": "FrameworksMockingServicesTests_android_server_crashrecovery"
+    },
+    {
+      "name": "RollbackPackageHealthObserverTests_server_rollback"
+    }
+  ]
+}
