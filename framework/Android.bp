@@ -16,10 +16,24 @@ package {
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
+// Temporary till we move the files in this directory
+filegroup {
+    name: "framework-crashrecovery-module-sources",
+    srcs: [
+        "java/**/*.java",
+        "java/**/*.aidl",
+    ],
+    path: "java",
+    visibility: [
+        "//frameworks/base/packages/CrashRecovery/framework",
+    ],
+}
+
 java_sdk_library {
     name: "framework-crashrecovery",
     srcs: [
         "java/**/*.java",
+        "java/**/*.aidl",
         ":framework-crashrecovery-sources",
     ],
     apex_available: [
