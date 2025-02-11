@@ -92,7 +92,7 @@ apex {
     key: "com.android.crashrecovery.key",
     certificate: ":com.android.crashrecovery.certificate",
     manifest: "manifest.json",
-    min_sdk_version: "35", // TODO: b/289203818 Update to 36 later
+    min_sdk_version: "36",
 }
 
 sdk {
