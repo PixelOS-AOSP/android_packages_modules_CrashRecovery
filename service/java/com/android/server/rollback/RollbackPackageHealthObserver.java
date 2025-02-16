@@ -131,36 +131,18 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     public int onHealthCheckFailed(@Nullable VersionedPackage failedPackage,
             @FailureReasons int failureReason, int mitigationCount) {
         int impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
-        if (Flags.recoverabilityDetection()) {
-            List<RollbackInfo> availableRollbacks = getAvailableRollbacks();
-            List<RollbackInfo> lowImpactRollbacks = getRollbacksAvailableForImpactLevel(
-                    availableRollbacks, PackageManager.ROLLBACK_USER_IMPACT_LOW);
-            if (!lowImpactRollbacks.isEmpty()) {
-                if (failureReason == PackageWatchdog.FAILURE_REASON_NATIVE_CRASH) {
-                    // For native crashes, we will directly roll back any available rollbacks at low
-                    // impact level
-                    impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_30;
-                } else if (getRollbackForPackage(failedPackage, lowImpactRollbacks) != null) {
-                    // Rollback is available for crashing low impact package
-                    impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_30;
-                } else {
-                    impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_70;
-                }
-            }
-        } else {
-            boolean anyRollbackAvailable = !mContext.getSystemService(RollbackManager.class)
-                    .getAvailableRollbacks().isEmpty();
-
-            if (failureReason == PackageWatchdog.FAILURE_REASON_NATIVE_CRASH
-                    && anyRollbackAvailable) {
-                // For native crashes, we will directly roll back any available rollbacks
-                // Note: For non-native crashes the rollback-all step has higher impact
+        List<RollbackInfo> availableRollbacks = getAvailableRollbacks();
+        List<RollbackInfo> lowImpactRollbacks = getRollbacksAvailableForImpactLevel(
+                availableRollbacks, PackageManager.ROLLBACK_USER_IMPACT_LOW);
+        if (!lowImpactRollbacks.isEmpty()) {
+            if (failureReason == PackageWatchdog.FAILURE_REASON_NATIVE_CRASH) {
+                // For native crashes, we will directly roll back any available rollbacks at low
+                // impact level
                 impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_30;
-            } else if (getAvailableRollback(failedPackage) != null) {
-                // Rollback is available, we may get a callback into #onExecuteHealthCheckMitigation
+            } else if (getRollbackForPackage(failedPackage, lowImpactRollbacks) != null) {
+                // Rollback is available for crashing low impact package
                 impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_30;
-            } else if (anyRollbackAvailable) {
-                // If any rollbacks are available, we will commit them
+            } else {
                 impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_70;
             }
         }
@@ -181,34 +163,20 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
                 + (failedPackage == null ? null : failedPackage.getPackageName())
                 + " rollbackReason: " + rollbackReason
                 + " mitigationCount: " + mitigationCount);
-        if (Flags.recoverabilityDetection()) {
-            List<RollbackInfo> availableRollbacks = getAvailableRollbacks();
-            if (rollbackReason == PackageWatchdog.FAILURE_REASON_NATIVE_CRASH) {
-                mHandler.post(() -> rollbackAllLowImpact(availableRollbacks, rollbackReason));
-                return MITIGATION_RESULT_SUCCESS;
-            }
+        List<RollbackInfo> availableRollbacks = getAvailableRollbacks();
+        if (rollbackReason == PackageWatchdog.FAILURE_REASON_NATIVE_CRASH) {
+            mHandler.post(() -> rollbackAllLowImpact(availableRollbacks, rollbackReason));
+            return MITIGATION_RESULT_SUCCESS;
+        }
 
-            List<RollbackInfo> lowImpactRollbacks = getRollbacksAvailableForImpactLevel(
-                    availableRollbacks, PackageManager.ROLLBACK_USER_IMPACT_LOW);
-            RollbackInfo rollback = getRollbackForPackage(failedPackage, lowImpactRollbacks);
-            if (rollback != null) {
-                mHandler.post(() -> rollbackPackage(rollback, failedPackage, rollbackReason));
-            } else if (!lowImpactRollbacks.isEmpty()) {
-                // Apply all available low impact rollbacks.
-                mHandler.post(() -> rollbackAllLowImpact(availableRollbacks, rollbackReason));
-            }
-        } else {
-            if (rollbackReason == PackageWatchdog.FAILURE_REASON_NATIVE_CRASH) {
-                mHandler.post(() -> rollbackAll(rollbackReason));
-                return MITIGATION_RESULT_SUCCESS;
-            }
-
-            RollbackInfo rollback = getAvailableRollback(failedPackage);
-            if (rollback != null) {
-                mHandler.post(() -> rollbackPackage(rollback, failedPackage, rollbackReason));
-            } else {
-                mHandler.post(() -> rollbackAll(rollbackReason));
-            }
+        List<RollbackInfo> lowImpactRollbacks = getRollbacksAvailableForImpactLevel(
+                availableRollbacks, PackageManager.ROLLBACK_USER_IMPACT_LOW);
+        RollbackInfo rollback = getRollbackForPackage(failedPackage, lowImpactRollbacks);
+        if (rollback != null) {
+            mHandler.post(() -> rollbackPackage(rollback, failedPackage, rollbackReason));
+        } else if (!lowImpactRollbacks.isEmpty()) {
+            // Apply all available low impact rollbacks.
+            mHandler.post(() -> rollbackAllLowImpact(availableRollbacks, rollbackReason));
         }
 
         // Assume rollbacks executed successfully
@@ -218,25 +186,20 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     @Override
     public int onBootLoop(int mitigationCount) {
         int impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
-        if (Flags.recoverabilityDetection()) {
-            List<RollbackInfo> availableRollbacks = getAvailableRollbacks();
-            if (!availableRollbacks.isEmpty()) {
-                impact = getUserImpactBasedOnRollbackImpactLevel(availableRollbacks);
-            }
+        List<RollbackInfo> availableRollbacks = getAvailableRollbacks();
+        if (!availableRollbacks.isEmpty()) {
+            impact = getUserImpactBasedOnRollbackImpactLevel(availableRollbacks);
         }
         return impact;
     }
 
     @Override
     public int onExecuteBootLoopMitigation(int mitigationCount) {
-        if (Flags.recoverabilityDetection()) {
-            List<RollbackInfo> availableRollbacks = getAvailableRollbacks();
+        List<RollbackInfo> availableRollbacks = getAvailableRollbacks();
 
-            triggerLeastImpactLevelRollback(availableRollbacks,
-                    PackageWatchdog.FAILURE_REASON_BOOT_LOOP);
-            return MITIGATION_RESULT_SUCCESS;
-        }
-        return MITIGATION_RESULT_SKIPPED;
+        triggerLeastImpactLevelRollback(availableRollbacks,
+                PackageWatchdog.FAILURE_REASON_BOOT_LOOP);
+        return MITIGATION_RESULT_SUCCESS;
     }
 
     @Override

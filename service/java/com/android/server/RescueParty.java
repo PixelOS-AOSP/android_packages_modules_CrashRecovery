@@ -239,20 +239,12 @@ public class RescueParty {
     }
 
     private static int getMaxRescueLevel(boolean mayPerformReboot) {
-        if (Flags.recoverabilityDetection()) {
-            if (!mayPerformReboot
-                    || SystemProperties.getBoolean(PROP_DISABLE_FACTORY_RESET_FLAG, false)) {
-                return SystemProperties.getInt(RESCUE_NON_REBOOT_LEVEL_LIMIT,
-                        DEFAULT_RESCUE_NON_REBOOT_LEVEL_LIMIT);
-            }
-            return RESCUE_LEVEL_FACTORY_RESET;
-        } else {
-            if (!mayPerformReboot
-                    || SystemProperties.getBoolean(PROP_DISABLE_FACTORY_RESET_FLAG, false)) {
-                return LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS;
-            }
-            return LEVEL_FACTORY_RESET;
+        if (!mayPerformReboot
+                || SystemProperties.getBoolean(PROP_DISABLE_FACTORY_RESET_FLAG, false)) {
+            return SystemProperties.getInt(RESCUE_NON_REBOOT_LEVEL_LIMIT,
+                    DEFAULT_RESCUE_NON_REBOOT_LEVEL_LIMIT);
         }
+        return RESCUE_LEVEL_FACTORY_RESET;
     }
 
     private static int getMaxRescueLevel() {
@@ -355,11 +347,7 @@ public class RescueParty {
 
     private static void executeRescueLevelInternal(Context context, int level, @Nullable
             String failedPackage) throws Exception {
-        if (Flags.recoverabilityDetection()) {
-            executeRescueLevelInternalNew(context, level, failedPackage);
-        } else {
-            executeRescueLevelInternalOld(context, level, failedPackage);
-        }
+        executeRescueLevelInternalNew(context, level, failedPackage);
     }
 
     private static void executeRescueLevelInternalOld(Context context, int level, @Nullable
@@ -519,38 +507,23 @@ public class RescueParty {
     }
 
     private static int mapRescueLevelToUserImpact(int rescueLevel) {
-        if (Flags.recoverabilityDetection()) {
-            switch (rescueLevel) {
-                case RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_10;
-                case RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_40;
-                case RESCUE_LEVEL_WARM_REBOOT:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_50;
-                case RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_71;
-                case RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_75;
-                case RESCUE_LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_80;
-                case RESCUE_LEVEL_FACTORY_RESET:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_100;
-                default:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
-            }
-        } else {
-            switch (rescueLevel) {
-                case LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS:
-                case LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_10;
-                case LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS:
-                case LEVEL_WARM_REBOOT:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_50;
-                case LEVEL_FACTORY_RESET:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_100;
-                default:
-                    return PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
-            }
+        switch (rescueLevel) {
+            case RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET:
+                return PackageHealthObserverImpact.USER_IMPACT_LEVEL_10;
+            case RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET:
+                return PackageHealthObserverImpact.USER_IMPACT_LEVEL_40;
+            case RESCUE_LEVEL_WARM_REBOOT:
+                return PackageHealthObserverImpact.USER_IMPACT_LEVEL_50;
+            case RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS:
+                return PackageHealthObserverImpact.USER_IMPACT_LEVEL_71;
+            case RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES:
+                return PackageHealthObserverImpact.USER_IMPACT_LEVEL_75;
+            case RESCUE_LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS:
+                return PackageHealthObserverImpact.USER_IMPACT_LEVEL_80;
+            case RESCUE_LEVEL_FACTORY_RESET:
+                return PackageHealthObserverImpact.USER_IMPACT_LEVEL_100;
+            default:
+                return PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
         }
     }
 
@@ -603,12 +576,7 @@ public class RescueParty {
             int impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
             if (!isDisabled() && (failureReason == PackageWatchdog.FAILURE_REASON_APP_CRASH
                     || failureReason == PackageWatchdog.FAILURE_REASON_APP_NOT_RESPONDING)) {
-                if (Flags.recoverabilityDetection()) {
-                    impact = mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
-                } else {
-                    impact =  mapRescueLevelToUserImpact(getRescueLevel(mitigationCount,
-                            mayPerformReboot(failedPackage)));
-                }
+                impact = mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
             }
 
             Slog.i(TAG, "Checking available remediations for health check failure."
@@ -633,11 +601,7 @@ public class RescueParty {
             if (failureReason == PackageWatchdog.FAILURE_REASON_APP_CRASH
                     || failureReason == PackageWatchdog.FAILURE_REASON_APP_NOT_RESPONDING) {
                 final int level;
-                if (Flags.recoverabilityDetection()) {
-                    level = getRescueLevel(mitigationCount);
-                } else {
-                    level = getRescueLevel(mitigationCount, mayPerformReboot(failedPackage));
-                }
+                level = getRescueLevel(mitigationCount);
                 executeRescueLevel(mContext,
                         failedPackage == null ? null : failedPackage.getPackageName(), level);
                 return MITIGATION_RESULT_SUCCESS;
@@ -670,11 +634,7 @@ public class RescueParty {
             if (isDisabled()) {
                 return PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
             }
-            if (Flags.recoverabilityDetection()) {
-                return mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
-            } else {
-                return mapRescueLevelToUserImpact(getRescueLevel(mitigationCount, true));
-            }
+            return mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
         }
 
         @Override
@@ -684,11 +644,7 @@ public class RescueParty {
             }
             boolean mayPerformReboot = !shouldThrottleReboot();
             final int level;
-            if (Flags.recoverabilityDetection()) {
-                level = getRescueLevel(mitigationCount);
-            } else {
-                level = getRescueLevel(mitigationCount, mayPerformReboot);
-            }
+            level = getRescueLevel(mitigationCount);
             executeRescueLevel(mContext, /*failedPackage=*/ null, level);
             return MITIGATION_RESULT_SUCCESS;
         }
@@ -762,59 +718,38 @@ public class RescueParty {
 
     private static class Level {
         static int none() {
-            return Flags.recoverabilityDetection() ? RESCUE_LEVEL_NONE : LEVEL_NONE;
+            return RESCUE_LEVEL_NONE;
         }
 
         static int reboot() {
-            return Flags.recoverabilityDetection() ? RESCUE_LEVEL_WARM_REBOOT : LEVEL_WARM_REBOOT;
+            return RESCUE_LEVEL_WARM_REBOOT;
         }
 
         static int factoryReset() {
-            return Flags.recoverabilityDetection()
-                    ? RESCUE_LEVEL_FACTORY_RESET
-                    : LEVEL_FACTORY_RESET;
+            return RESCUE_LEVEL_FACTORY_RESET;
         }
     }
 
     private static String levelToString(int level) {
-        if (Flags.recoverabilityDetection()) {
-            switch (level) {
-                case RESCUE_LEVEL_NONE:
-                    return "NONE";
-                case RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET:
-                    return "SCOPED_DEVICE_CONFIG_RESET";
-                case RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET:
-                    return "ALL_DEVICE_CONFIG_RESET";
-                case RESCUE_LEVEL_WARM_REBOOT:
-                    return "WARM_REBOOT";
-                case RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS:
-                    return "RESET_SETTINGS_UNTRUSTED_DEFAULTS";
-                case RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES:
-                    return "RESET_SETTINGS_UNTRUSTED_CHANGES";
-                case RESCUE_LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS:
-                    return "RESET_SETTINGS_TRUSTED_DEFAULTS";
-                case RESCUE_LEVEL_FACTORY_RESET:
-                    return "FACTORY_RESET";
-                default:
-                    return Integer.toString(level);
-            }
-        } else {
-            switch (level) {
-                case LEVEL_NONE:
-                    return "NONE";
-                case LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS:
-                    return "RESET_SETTINGS_UNTRUSTED_DEFAULTS";
-                case LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES:
-                    return "RESET_SETTINGS_UNTRUSTED_CHANGES";
-                case LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS:
-                    return "RESET_SETTINGS_TRUSTED_DEFAULTS";
-                case LEVEL_WARM_REBOOT:
-                    return "WARM_REBOOT";
-                case LEVEL_FACTORY_RESET:
-                    return "FACTORY_RESET";
-                default:
-                    return Integer.toString(level);
-            }
+        switch (level) {
+            case RESCUE_LEVEL_NONE:
+                return "NONE";
+            case RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET:
+                return "SCOPED_DEVICE_CONFIG_RESET";
+            case RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET:
+                return "ALL_DEVICE_CONFIG_RESET";
+            case RESCUE_LEVEL_WARM_REBOOT:
+                return "WARM_REBOOT";
+            case RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS:
+                return "RESET_SETTINGS_UNTRUSTED_DEFAULTS";
+            case RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES:
+                return "RESET_SETTINGS_UNTRUSTED_CHANGES";
+            case RESCUE_LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS:
+                return "RESET_SETTINGS_TRUSTED_DEFAULTS";
+            case RESCUE_LEVEL_FACTORY_RESET:
+                return "FACTORY_RESET";
+            default:
+                return Integer.toString(level);
         }
     }
 }
