@@ -271,30 +271,13 @@ public class RescueParty {
      * @return the rescue level for the n-th mitigation attempt.
      */
     private static int getRescueLevel(int mitigationCount, boolean mayPerformReboot) {
-        if (!Flags.deprecateFlagsAndSettingsResets()) {
-            if (mitigationCount == 1) {
-                return LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS;
-            } else if (mitigationCount == 2) {
-                return LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES;
-            } else if (mitigationCount == 3) {
-                return LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS;
-            } else if (mitigationCount == 4) {
-                return Math.min(getMaxRescueLevel(mayPerformReboot), LEVEL_WARM_REBOOT);
-            } else if (mitigationCount >= 5) {
-                return Math.min(getMaxRescueLevel(mayPerformReboot), LEVEL_FACTORY_RESET);
-            } else {
-                Slog.w(TAG, "Expected positive mitigation count, was " + mitigationCount);
-                return LEVEL_NONE;
-            }
+        if (mitigationCount == 1) {
+            return Level.reboot();
+        } else if (mitigationCount >= 2) {
+            return Math.min(getMaxRescueLevel(), Level.factoryReset());
         } else {
-            if (mitigationCount == 1) {
-                return Level.reboot();
-            } else if (mitigationCount >= 2) {
-                return Math.min(getMaxRescueLevel(), Level.factoryReset());
-            } else {
-                Slog.w(TAG, "Expected positive mitigation count, was " + mitigationCount);
-                return LEVEL_NONE;
-            }
+            Slog.w(TAG, "Expected positive mitigation count, was " + mitigationCount);
+            return LEVEL_NONE;
         }
     }
 
@@ -449,10 +432,8 @@ public class RescueParty {
 
     private static void executeWarmReboot(Context context, int level,
             @Nullable String failedPackage) {
-        if (Flags.deprecateFlagsAndSettingsResets()) {
-            if (shouldThrottleReboot()) {
-                return;
-            }
+        if (shouldThrottleReboot()) {
+            return;
         }
 
         // Request the reboot from a separate thread to avoid deadlock on PackageWatchdog
@@ -486,10 +467,8 @@ public class RescueParty {
 
     private static void executeFactoryReset(Context context, int level,
             @Nullable String failedPackage) {
-        if (Flags.deprecateFlagsAndSettingsResets()) {
-            if (shouldThrottleReboot()) {
-                return;
-            }
+        if (shouldThrottleReboot()) {
+            return;
         }
         setFactoryResetProperty(true);
         long now = System.currentTimeMillis();
@@ -625,12 +604,7 @@ public class RescueParty {
             if (!isDisabled() && (failureReason == PackageWatchdog.FAILURE_REASON_APP_CRASH
                     || failureReason == PackageWatchdog.FAILURE_REASON_APP_NOT_RESPONDING)) {
                 if (Flags.recoverabilityDetection()) {
-                    if (!Flags.deprecateFlagsAndSettingsResets()) {
-                        impact =  mapRescueLevelToUserImpact(getRescueLevel(mitigationCount,
-                                mayPerformReboot(failedPackage), failedPackage));
-                    } else {
-                        impact =  mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
-                    }
+                    impact = mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
                 } else {
                     impact =  mapRescueLevelToUserImpact(getRescueLevel(mitigationCount,
                             mayPerformReboot(failedPackage)));
@@ -660,12 +634,7 @@ public class RescueParty {
                     || failureReason == PackageWatchdog.FAILURE_REASON_APP_NOT_RESPONDING) {
                 final int level;
                 if (Flags.recoverabilityDetection()) {
-                    if (!Flags.deprecateFlagsAndSettingsResets()) {
-                        level = getRescueLevel(mitigationCount, mayPerformReboot(failedPackage),
-                                failedPackage);
-                    } else {
-                        level = getRescueLevel(mitigationCount);
-                    }
+                    level = getRescueLevel(mitigationCount);
                 } else {
                     level = getRescueLevel(mitigationCount, mayPerformReboot(failedPackage));
                 }
@@ -702,12 +671,7 @@ public class RescueParty {
                 return PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
             }
             if (Flags.recoverabilityDetection()) {
-                if (!Flags.deprecateFlagsAndSettingsResets()) {
-                    return mapRescueLevelToUserImpact(getRescueLevel(mitigationCount,
-                            true, /*failedPackage=*/ null));
-                } else {
-                    return mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
-                }
+                return mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
             } else {
                 return mapRescueLevelToUserImpact(getRescueLevel(mitigationCount, true));
             }
@@ -721,12 +685,7 @@ public class RescueParty {
             boolean mayPerformReboot = !shouldThrottleReboot();
             final int level;
             if (Flags.recoverabilityDetection()) {
-                if (!Flags.deprecateFlagsAndSettingsResets()) {
-                    level = getRescueLevel(mitigationCount, mayPerformReboot,
-                            /*failedPackage=*/ null);
-                } else {
-                    level = getRescueLevel(mitigationCount);
-                }
+                level = getRescueLevel(mitigationCount);
             } else {
                 level = getRescueLevel(mitigationCount, mayPerformReboot);
             }
