@@ -482,12 +482,10 @@ public class PackageWatchdog {
         }
         synchronized (sLock) {
             final long now = mSystemClock.uptimeMillis();
-            if (Flags.recoverabilityDetection()) {
-                if (now >= mLastMitigation
-                        && (now - mLastMitigation) < getMitigationWindowMs()) {
-                    Slog.i(TAG, "Skipping notifyPackageFailure mitigation");
-                    return;
-                }
+            if (now >= mLastMitigation
+                    && (now - mLastMitigation) < getMitigationWindowMs()) {
+                Slog.i(TAG, "Skipping notifyPackageFailure mitigation");
+                return;
             }
         }
         mLongTaskHandler.post(() -> {
@@ -541,16 +539,8 @@ public class PackageWatchdog {
                             } else {
                                 mitigationCount = 1;
                             }
-                            if (Flags.recoverabilityDetection()) {
-                                maybeExecute(currentObserverToNotify, versionedPackage,
-                                        failureReason, currentObserverImpact, mitigationCount);
-                            } else {
-                                PackageHealthObserver registeredObserver =
-                                        currentObserverToNotify.registeredObserver;
-                                currentObserverToNotify.observerExecutor.execute(() ->
-                                        registeredObserver.onExecuteHealthCheckMitigation(
-                                                versionedPackage, failureReason, mitigationCount));
-                            }
+                            maybeExecute(currentObserverToNotify, versionedPackage,
+                                    failureReason, currentObserverImpact, mitigationCount);
                         }
                     }
                 }
@@ -581,17 +571,8 @@ public class PackageWatchdog {
             }
         }
         if (currentObserverToNotify != null) {
-            if (Flags.recoverabilityDetection()) {
-                maybeExecute(currentObserverToNotify, failingPackage, failureReason,
-                        currentObserverImpact, /*mitigationCount=*/ 1);
-            } else {
-                PackageHealthObserver registeredObserver =
-                        currentObserverToNotify.registeredObserver;
-                currentObserverToNotify.observerExecutor.execute(() ->
-                        registeredObserver.onExecuteHealthCheckMitigation(failingPackage,
-                                failureReason, 1));
-
-            }
+            maybeExecute(currentObserverToNotify, failingPackage, failureReason,
+                    currentObserverImpact, /*mitigationCount=*/ 1);
         }
     }
 
@@ -640,9 +621,6 @@ public class PackageWatchdog {
             // mitigations for every restart after that.
             boolean mitigate = mBootThreshold.incrementAndTest();
             if (mitigate) {
-                if (!Flags.recoverabilityDetection()) {
-                    mBootThreshold.reset();
-                }
                 int mitigationCount = mBootThreshold.getMitigationCount() + 1;
                 ObserverInternal currentObserverToNotify = null;
                 int currentObserverImpact = Integer.MAX_VALUE;
@@ -650,10 +628,8 @@ public class PackageWatchdog {
                     final ObserverInternal observer = mAllObservers.valueAt(i);
                     PackageHealthObserver registeredObserver = observer.registeredObserver;
                     if (registeredObserver != null) {
-                        int impact = Flags.recoverabilityDetection()
-                                ? registeredObserver.onBootLoop(
-                                        observer.getBootMitigationCount() + 1)
-                                : registeredObserver.onBootLoop(mitigationCount);
+                        int impact = registeredObserver.onBootLoop(
+                                observer.getBootMitigationCount() + 1);
                         if (impact != PackageHealthObserverImpact.USER_IMPACT_LEVEL_0
                                 && impact < currentObserverImpact) {
                             currentObserverToNotify = observer;
@@ -665,23 +641,14 @@ public class PackageWatchdog {
                 if (currentObserverToNotify != null) {
                     PackageHealthObserver registeredObserver =
                             currentObserverToNotify.registeredObserver;
-                    if (Flags.recoverabilityDetection()) {
-                        int currentObserverMitigationCount =
-                                currentObserverToNotify.getBootMitigationCount() + 1;
-                        currentObserverToNotify.setBootMitigationCount(
-                                currentObserverMitigationCount);
-                        saveAllObserversBootMitigationCountToMetadata(METADATA_FILE);
-                        currentObserverToNotify.observerExecutor
-                                .execute(() -> registeredObserver.onExecuteBootLoopMitigation(
-                                        currentObserverMitigationCount));
-                    } else {
-                        mBootThreshold.setMitigationCount(mitigationCount);
-                        mBootThreshold.saveMitigationCountToMetadata();
-                        currentObserverToNotify.observerExecutor
-                                .execute(() -> registeredObserver.onExecuteBootLoopMitigation(
-                                        mitigationCount));
-
-                    }
+                    int currentObserverMitigationCount =
+                            currentObserverToNotify.getBootMitigationCount() + 1;
+                    currentObserverToNotify.setBootMitigationCount(
+                            currentObserverMitigationCount);
+                    saveAllObserversBootMitigationCountToMetadata(METADATA_FILE);
+                    currentObserverToNotify.observerExecutor
+                            .execute(() -> registeredObserver.onExecuteBootLoopMitigation(
+                                    currentObserverMitigationCount));
                 }
             }
         }
@@ -1488,9 +1455,7 @@ public class PackageWatchdog {
             try {
                 out.startTag(null, TAG_OBSERVER);
                 out.attribute(null, ATTR_NAME, name);
-                if (Flags.recoverabilityDetection()) {
-                    out.attribute(null, ATTR_MITIGATION_COUNT, Integer.toString(mMitigationCount));
-                }
+                out.attribute(null, ATTR_MITIGATION_COUNT, Integer.toString(mMitigationCount));
                 for (int i = 0; i < mPackages.size(); i++) {
                     MonitoredPackage p = mPackages.valueAt(i);
                     p.writeLocked(out);
@@ -1627,15 +1592,13 @@ public class PackageWatchdog {
             List<MonitoredPackage> packages = new ArrayList<>();
             int innerDepth = parser.getDepth();
             try {
-                if (Flags.recoverabilityDetection()) {
-                    try {
-                        observerMitigationCount = Integer.parseInt(
-                                parser.getAttributeValue(null, ATTR_MITIGATION_COUNT));
-                    } catch (Exception e) {
-                        Slog.i(
-                            TAG,
-                            "ObserverInternal mitigation count was not present.");
-                    }
+                try {
+                    observerMitigationCount = Integer.parseInt(
+                            parser.getAttributeValue(null, ATTR_MITIGATION_COUNT));
+                } catch (Exception e) {
+                    Slog.i(
+                        TAG,
+                        "ObserverInternal mitigation count was not present.");
                 }
                 while (XmlUtils.nextElementWithin(parser, innerDepth)) {
                     if (TAG_PACKAGE.equals(parser.getName())) {
@@ -2131,11 +2094,7 @@ public class PackageWatchdog {
         /** Increments the boot counter, and returns whether the device is bootlooping. */
         @GuardedBy("sLock")
         public boolean incrementAndTest() {
-            if (Flags.recoverabilityDetection()) {
-                readAllObserversBootMitigationCountIfNecessary(METADATA_FILE);
-            } else {
-                readMitigationCountFromMetadataIfNecessary();
-            }
+            readAllObserversBootMitigationCountIfNecessary(METADATA_FILE);
 
             final long now = mSystemClock.uptimeMillis();
             if (now - getStart() < 0) {
@@ -2145,11 +2104,7 @@ public class PackageWatchdog {
             }
             if (now - getMitigationStart() > DEFAULT_DEESCALATION_WINDOW_MS) {
                 setMitigationStart(now);
-                if (Flags.recoverabilityDetection()) {
-                    resetAllObserversBootMitigationCount();
-                } else {
-                    setMitigationCount(0);
-                }
+                resetAllObserversBootMitigationCount();
             }
             final long window = now - getStart();
             if (window >= mTriggerWindow) {
@@ -2160,13 +2115,10 @@ public class PackageWatchdog {
                 int count = getCount() + 1;
                 setCount(count);
                 EventLog.writeEvent(LOG_TAG_RESCUE_NOTE, Process.ROOT_UID, count, window);
-                if (Flags.recoverabilityDetection()) {
-                    // After a reboot (e.g. by WARM_REBOOT or mainline rollback) we apply
-                    // mitigations without waiting for DEFAULT_BOOT_LOOP_TRIGGER_COUNT.
-                    return (count >= mBootTriggerCount)
-                            || (performedMitigationsDuringWindow() && count > 1);
-                }
-                return count >= mBootTriggerCount;
+                // After a reboot (e.g. by WARM_REBOOT or mainline rollback) we apply
+                // mitigations without waiting for DEFAULT_BOOT_LOOP_TRIGGER_COUNT.
+                return (count >= mBootTriggerCount)
+                        || (performedMitigationsDuringWindow() && count > 1);
             }
         }
 
