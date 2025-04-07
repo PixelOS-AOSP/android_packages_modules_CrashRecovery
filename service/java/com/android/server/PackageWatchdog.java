@@ -2202,4 +2202,17 @@ public class PackageWatchdog {
         mContext.registerReceiverForAllUsers(shutdownEventReceiver, filter, null,
                 /* run on main thread */ null);
     }
+
+    /** @hide **/
+    public static String failureReasonToLog(@FailureReasons int failureReason) {
+        return switch (failureReason) {
+            case FAILURE_REASON_NATIVE_CRASH -> "NATIVE_CRASH";
+            case FAILURE_REASON_EXPLICIT_HEALTH_CHECK -> "EXPLICIT_HEALTH_CHECK";
+            case FAILURE_REASON_APP_CRASH -> "APP_CRASH";
+            case FAILURE_REASON_APP_NOT_RESPONDING -> "APP_NOT_RESPONDING";
+            case FAILURE_REASON_BOOT_LOOP -> "BOOT_LOOP";
+            default -> "UNKNOWN";
+        };
+    }
+
 }

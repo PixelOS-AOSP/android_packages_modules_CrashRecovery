@@ -17,6 +17,7 @@
 package com.android.server.rollback;
 
 import static com.android.server.PackageWatchdog.MITIGATION_RESULT_SUCCESS;
+import static com.android.server.PackageWatchdog.failureReasonToLog;
 import static com.android.server.crashrecovery.CrashRecoveryUtils.logCrashRecoveryEvent;
 
 import android.annotation.AnyThread;
@@ -126,6 +127,18 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         }
     }
 
+    private String getFailedPackageName(@Nullable VersionedPackage failedPackage,
+            @FailureReasons int failureReason) {
+        if (failureReason == PackageWatchdog.FAILURE_REASON_NATIVE_CRASH) {
+            return SystemProperties.get(
+                    "sys.init.updatable_crashing_process_name", "UNKNOWN_NATIVE");
+        }
+        if (failureReason == PackageWatchdog.FAILURE_REASON_BOOT_LOOP) {
+            return "UNKNOWN_BOOT_LOOP";
+        }
+        return (failedPackage == null ? "UNKNOWN" : failedPackage.getPackageName());
+    }
+
     @Override
     public int onHealthCheckFailed(@Nullable VersionedPackage failedPackage,
             @FailureReasons int failureReason, int mitigationCount) {
@@ -147,9 +160,8 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         }
 
         Slog.i(TAG, "Checking available remediations for health check failure."
-                + " failedPackage: "
-                + (failedPackage == null ? null : failedPackage.getPackageName())
-                + " failureReason: " + failureReason
+                + " failedPackage: " + getFailedPackageName(failedPackage, failureReason)
+                + " failureReason: " + failureReasonToLog(failureReason)
                 + " available impact: " + impact);
         return impact;
     }
@@ -157,14 +169,15 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     @Override
     public int onExecuteHealthCheckMitigation(@Nullable VersionedPackage failedPackage,
             @FailureReasons int rollbackReason, int mitigationCount) {
+        String failedPackageName = getFailedPackageName(failedPackage, rollbackReason);
         Slog.i(TAG, "Executing remediation."
-                + " failedPackage: "
-                + (failedPackage == null ? null : failedPackage.getPackageName())
-                + " rollbackReason: " + rollbackReason
+                + " failedPackage: " + failedPackageName
+                + " rollbackReason: " + failureReasonToLog(rollbackReason)
                 + " mitigationCount: " + mitigationCount);
         List<RollbackInfo> availableRollbacks = getAvailableRollbacks();
         if (rollbackReason == PackageWatchdog.FAILURE_REASON_NATIVE_CRASH) {
-            mHandler.post(() -> rollbackAllLowImpact(availableRollbacks, rollbackReason));
+            mHandler.post(() -> rollbackAllLowImpact(availableRollbacks, failedPackageName,
+                    rollbackReason));
             return MITIGATION_RESULT_SUCCESS;
         }
 
@@ -172,10 +185,12 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
                 availableRollbacks, PackageManager.ROLLBACK_USER_IMPACT_LOW);
         RollbackInfo rollback = getRollbackForPackage(failedPackage, lowImpactRollbacks);
         if (rollback != null) {
-            mHandler.post(() -> rollbackPackage(rollback, failedPackage, rollbackReason));
+            mHandler.post(() -> rollbackPackage(rollback, failedPackage, rollbackReason,
+                    failedPackageName));
         } else if (!lowImpactRollbacks.isEmpty()) {
             // Apply all available low impact rollbacks.
-            mHandler.post(() -> rollbackAllLowImpact(availableRollbacks, rollbackReason));
+            mHandler.post(() -> rollbackAllLowImpact(availableRollbacks, failedPackageName,
+                    rollbackReason));
         }
 
         // Assume rollbacks executed successfully
@@ -445,24 +460,17 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
      */
     @WorkerThread
     private void rollbackPackage(RollbackInfo rollback, VersionedPackage failedPackage,
-            @FailureReasons int rollbackReason) {
+            @FailureReasons int rollbackReason, String failedPackageName) {
         assertInWorkerThread();
-        String failedPackageName = (failedPackage == null ? null : failedPackage.getPackageName());
 
         Slog.i(TAG, "Rolling back package. RollbackId: " + rollback.getRollbackId()
                 + " failedPackage: " + failedPackageName
-                + " rollbackReason: " + rollbackReason);
+                + " rollbackReason: " + failureReasonToLog(rollbackReason));
         logCrashRecoveryEvent(Log.DEBUG, String.format("Rolling back %s. Reason: %s",
-                failedPackageName, rollbackReason));
+                failedPackageName, failureReasonToLog(rollbackReason)));
         final RollbackManager rollbackManager = mContext.getSystemService(RollbackManager.class);
         int reasonToLog = WatchdogRollbackLogger.mapFailureReasonToMetric(rollbackReason);
-        final String failedPackageToLog;
-        if (rollbackReason == PackageWatchdog.FAILURE_REASON_NATIVE_CRASH) {
-            failedPackageToLog = SystemProperties.get(
-                    "sys.init.updatable_crashing_process_name", "");
-        } else {
-            failedPackageToLog = failedPackage.getPackageName();
-        }
+
         VersionedPackage logPackageTemp = null;
         if (isModule(failedPackage.getPackageName())) {
             logPackageTemp = WatchdogRollbackLogger.getLogPackage(mContext, failedPackage);
@@ -471,7 +479,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         final VersionedPackage logPackage = logPackageTemp;
         WatchdogRollbackLogger.logEvent(logPackage,
                 CrashRecoveryStatsLog.WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_TYPE__ROLLBACK_INITIATE,
-                reasonToLog, failedPackageToLog);
+                reasonToLog, failedPackageName);
 
         Consumer<Intent> onResult = result -> {
             assertInWorkerThread();
@@ -484,19 +492,19 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
                     WatchdogRollbackLogger.logEvent(logPackage,
                             CrashRecoveryStatsLog
                             .WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_TYPE__ROLLBACK_BOOT_TRIGGERED,
-                            reasonToLog, failedPackageToLog);
+                            reasonToLog, failedPackageName);
 
                 } else {
                     WatchdogRollbackLogger.logEvent(logPackage,
                             CrashRecoveryStatsLog
                                     .WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_TYPE__ROLLBACK_SUCCESS,
-                            reasonToLog, failedPackageToLog);
+                            reasonToLog, failedPackageName);
                 }
             } else {
                 WatchdogRollbackLogger.logEvent(logPackage,
                         CrashRecoveryStatsLog
                                 .WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_TYPE__ROLLBACK_FAILURE,
-                        reasonToLog, failedPackageToLog);
+                        reasonToLog, failedPackageName);
             }
             if (rollback.isStaged()) {
                 markStagedSessionHandled(rollback.getRollbackId());
@@ -560,7 +568,8 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
                 VersionedPackage firstRollback =
                         rollback.getPackages().get(0).getVersionRolledBackFrom();
                 rollbackPackage(rollback, firstRollback,
-                        PackageWatchdog.FAILURE_REASON_NATIVE_CRASH);
+                        PackageWatchdog.FAILURE_REASON_NATIVE_CRASH,
+                        getFailedPackageName(null, PackageWatchdog.FAILURE_REASON_NATIVE_CRASH));
                 found = true;
             }
         }
@@ -578,7 +587,8 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
 
         if (minRollbackImpactLevel == PackageManager.ROLLBACK_USER_IMPACT_LOW) {
             // Apply all available low impact rollbacks.
-            mHandler.post(() -> rollbackAllLowImpact(availableRollbacks, rollbackReason));
+            mHandler.post(() -> rollbackAllLowImpact(availableRollbacks,
+                    getFailedPackageName(null, rollbackReason), rollbackReason));
         } else if (minRollbackImpactLevel == PackageManager.ROLLBACK_USER_IMPACT_HIGH) {
             // Check disable_high_impact_rollback device config before performing rollback
             if (SystemProperties.getBoolean(PROP_DISABLE_HIGH_IMPACT_ROLLBACK_FLAG, false)) {
@@ -616,17 +626,21 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
                         .getVersionRolledBackFrom();
         Slog.i(TAG, "Rolling back high impact rollback for package: "
                 + firstRollback.getPackageName());
-        rollbackPackage(sortedHighImpactRollbacks.get(0), firstRollback, rollbackReason);
+        rollbackPackage(sortedHighImpactRollbacks.get(0), firstRollback, rollbackReason,
+                getFailedPackageName(null, rollbackReason));
     }
 
     /**
      * Rollback all available low impact rollbacks
      * @param availableRollbacks all available rollbacks
+     * @param failedPackageName Name of package failed if any
      * @param rollbackReason reason to rollbacks
      */
     @WorkerThread
     private void rollbackAllLowImpact(
-            List<RollbackInfo> availableRollbacks, @FailureReasons int rollbackReason) {
+            List<RollbackInfo> availableRollbacks,
+            String failedPackageName,
+            @FailureReasons int rollbackReason) {
         assertInWorkerThread();
 
         List<RollbackInfo> lowImpactRollbacks = getRollbacksAvailableForImpactLevel(
@@ -636,8 +650,9 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
             return;
         }
 
-        Slog.i(TAG, "Rolling back all available low impact rollbacks");
-        logCrashRecoveryEvent(Log.DEBUG, "Rolling back all available. Reason: " + rollbackReason);
+        Slog.i(TAG, "Rolling back all available low impact rollbacks due to " + failedPackageName);
+        logCrashRecoveryEvent(Log.DEBUG,
+                "Rolling back all available. Reason: " + failureReasonToLog(rollbackReason));
         // Add all rollback ids to mPendingStagedRollbackIds, so that we do not reboot before all
         // pending staged rollbacks are handled.
         for (RollbackInfo rollback : lowImpactRollbacks) {
@@ -649,7 +664,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         for (RollbackInfo rollback : lowImpactRollbacks) {
             VersionedPackage firstRollback =
                     rollback.getPackages().get(0).getVersionRolledBackFrom();
-            rollbackPackage(rollback, firstRollback, rollbackReason);
+            rollbackPackage(rollback, firstRollback, rollbackReason, failedPackageName);
         }
     }
 
