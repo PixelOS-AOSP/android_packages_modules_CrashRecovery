@@ -17,8 +17,10 @@
 package com.android.server.crashrecovery;
 
 import android.os.Environment;
+import android.util.FileUtils;
 import android.util.IndentingPrintWriter;
 import android.util.Log;
+import android.util.SparseArray;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -81,5 +83,43 @@ public class CrashRecoveryUtils {
     private static File getCrashRecoveryEventsFile() {
         File systemDir = new File(Environment.getDataDirectory(), "system");
         return new File(systemDir, "crashrecovery-events.txt");
+    }
+
+    /** Append "key,value" into designated file **/
+    public static void putKeyValue(File file, int key, String value) {
+        try {
+            FileOutputStream fos = new FileOutputStream(file, true);
+            PrintWriter pw = new PrintWriter(fos);
+            pw.append(String.valueOf(key)).append(",").append(value);
+            pw.println();
+            pw.flush();
+            FileUtils.sync(fos);
+            pw.close();
+        } catch (IOException e) {
+            Log.e(TAG, String.format("Failed to save id %s, value %s into %s", key, value,
+                    file.getAbsolutePath()), e);
+            file.delete();
+        }
+    }
+
+    public static SparseArray<String> readAllKeyValues(File file) {
+        SparseArray<String> result = new SparseArray<>();
+        try {
+            String line;
+            BufferedReader reader = new BufferedReader(new FileReader(file));
+            while ((line = reader.readLine()) != null) {
+                // Each line is of the format: "id,value"
+                String[] values = line.trim().split(",");
+                String key = values[0];
+                String value = "";
+                if (values.length > 1) {
+                    value = values[1];
+                }
+                result.put(Integer.parseInt(key), value);
+            }
+        } catch (Exception ignore) {
+            return new SparseArray<>();
+        }
+        return result;
     }
 }
