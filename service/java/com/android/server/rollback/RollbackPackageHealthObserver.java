@@ -38,11 +38,11 @@ import android.content.pm.VersionedPackage;
 import android.content.rollback.PackageRollbackInfo;
 import android.content.rollback.RollbackInfo;
 import android.content.rollback.RollbackManager;
-import android.crashrecovery.flags.Flags;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.sysprop.CrashRecoveryProperties;
 import android.util.ArraySet;
@@ -64,10 +64,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -77,7 +79,7 @@ import java.util.function.Consumer;
  *
  * @hide
  */
-@FlaggedApi(Flags.FLAG_ENABLE_CRASHRECOVERY)
+@FlaggedApi(android.crashrecovery.flags.Flags.FLAG_ENABLE_CRASHRECOVERY)
 @SuppressLint({"CallbackName"})
 @SystemApi(client = SystemApi.Client.SYSTEM_SERVER)
 public final class RollbackPackageHealthObserver implements PackageHealthObserver {
@@ -91,14 +93,24 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     private static final String PROP_DISABLE_HIGH_IMPACT_ROLLBACK_FLAG =
             "persist.device_config.configuration.disable_high_impact_rollback";
 
+    // Rollbacks available for RollbackPackageHealthObserver for the first 14 days.
+    private static final long DEFAULT_ROLLBACK_AVAILABILITY_DURATION_MILLIS =
+            TimeUnit.DAYS.toMillis(14);
+
     private final Context mContext;
     private final Handler mHandler;
     private final File mLastStagedRollbackIdsFile;
     private final File mTwoPhaseRollbackEnabledFile;
+    private final File mRollbackTimestampsFile;
+    private final Object mRollbackTimestampsFileLock = new Object();
     // Staged rollback ids that have been committed but their session is not yet ready
     private final Set<Integer> mPendingStagedRollbackIds = new ArraySet<>();
     // True if needing to roll back only rebootless apexes when native crash happens
     private boolean mTwoPhaseRollbackEnabled;
+
+    // The timestamp when device is booted.
+    // This is used as a reference for the timestamp recorded in mRollbackTimestampsFile.
+    private long  mBootTimestamp;
 
     @VisibleForTesting
     public RollbackPackageHealthObserver(@NonNull Context context) {
@@ -110,6 +122,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         dataDir.mkdirs();
         mLastStagedRollbackIdsFile = new File(dataDir, "last-staged-rollback-ids");
         mTwoPhaseRollbackEnabledFile = new File(dataDir, "two-phase-rollback-enabled");
+        mRollbackTimestampsFile = new File(dataDir, "rollback-timestamps");
         PackageWatchdog.getInstance(mContext).registerHealthObserver(context.getMainExecutor(),
                 this);
 
@@ -121,6 +134,12 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
             // installed before reboot is stable if native crash didn't happen.
             mTwoPhaseRollbackEnabled = false;
             writeBoolean(mTwoPhaseRollbackEnabledFile, false);
+        }
+
+        if (com.android.crashrecovery.flags.Flags
+                .configurePackageHealthObserverRollbackTimeout()) {
+            getHandler().post(this::updateBootTimestamp);
+            registerTimeChangeReceiver();
         }
     }
 
@@ -232,8 +251,26 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         return isPersistentSystemApp(packageName);
     }
 
-    private List<RollbackInfo> getAvailableRollbacks() {
-        return mContext.getSystemService(RollbackManager.class).getAvailableRollbacks();
+    @VisibleForTesting
+    List<RollbackInfo> getAvailableRollbacks() {
+        final List<RollbackInfo> availableRollbacks =
+                mContext.getSystemService(RollbackManager.class).getAvailableRollbacks();
+        if (com.android.crashrecovery.flags.Flags
+                .configurePackageHealthObserverRollbackTimeout()) {
+            final SparseArray<String> rollbackTimestamps;
+            synchronized (mRollbackTimestampsFileLock) {
+                rollbackTimestamps = CrashRecoveryUtils.readAllKeyValues(mRollbackTimestampsFile);
+            }
+            return availableRollbacks.stream().filter(r -> {
+                String timestamp = rollbackTimestamps.get(r.getRollbackId());
+                // If the timestamp cannot be found, it means that such rollback is created before
+                // installing the CrashRecovery version with "rollback-observer/rollback-timestamp".
+                // On the safe side, it should be considered as available rollback.
+                return timestamp == null || Instant.now().isBefore(Instant.parse(timestamp)
+                        .plusMillis(DEFAULT_ROLLBACK_AVAILABILITY_DURATION_MILLIS));
+            }).toList();
+        }
+        return availableRollbacks;
     }
 
     private boolean isPersistentSystemApp(@NonNull String packageName) {
@@ -254,6 +291,10 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     @NonNull
     public void notifyRollbackAvailable(@NonNull RollbackInfo rollback) {
         mHandler.post(() -> {
+            if (com.android.crashrecovery.flags.Flags
+                    .configurePackageHealthObserverRollbackTimeout()) {
+                recordRollbackTimestamp(rollback, Instant.now());
+            }
             // Enable two-phase rollback when a rebootless apex rollback is made available.
             // We assume the rebootless apex is stable and is less likely to be the cause
             // if native crash doesn't happen before reboot. So we will clear the flag and disable
@@ -263,6 +304,14 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
                 writeBoolean(mTwoPhaseRollbackEnabledFile, true);
             }
         });
+    }
+
+    @VisibleForTesting
+    void recordRollbackTimestamp(RollbackInfo rollback, Instant timestamp) {
+        synchronized (mRollbackTimestampsFileLock) {
+            CrashRecoveryUtils.putKeyValue(mRollbackTimestampsFile, rollback.getRollbackId(),
+                    timestamp.toString());
+        }
     }
 
     private static boolean isRebootlessApex(RollbackInfo rollback) {
@@ -289,7 +338,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         assertInWorkerThread();
 
         RollbackManager rollbackManager = mContext.getSystemService(RollbackManager.class);
-        if (!rollbackManager.getAvailableRollbacks().isEmpty()) {
+        if (!getAvailableRollbacks().isEmpty()) {
             // TODO(gavincorkery): Call into Package Watchdog from outside the observer
             PackageWatchdog.getInstance(mContext).scheduleCheckAndMitigateNativeCrashes();
         }
@@ -672,5 +721,54 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     @VisibleForTesting
     Handler getHandler() {
         return mHandler;
+    }
+
+    @AnyThread
+    private void registerTimeChangeReceiver() {
+        final BroadcastReceiver timeChangeIntentReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                assertInWorkerThread();
+                updateRollbackTimestampFile();
+            }
+        };
+        final IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_TIME_CHANGED);
+        mContext.registerReceiver(timeChangeIntentReceiver, filter,
+                null /* broadcastPermission */, getHandler());
+    }
+
+    @VisibleForTesting
+    void updateRollbackTimestampFile() {
+        final long oldBootTimestamp = getBootTimestamp();
+        final long offset = updateBootTimestamp() - oldBootTimestamp;
+
+        synchronized (mRollbackTimestampsFileLock) {
+            final SparseArray<String> rollbackTimestamps =
+                    CrashRecoveryUtils.readAllKeyValues(mRollbackTimestampsFile);
+            SparseArray<String> updatedRollbackTimestamps =
+                    new SparseArray<>(rollbackTimestamps.size());
+            for (int i = 0; i < rollbackTimestamps.size(); i++) {
+                int rollbackId = rollbackTimestamps.keyAt(i);
+                Instant updatedTimestamp =
+                        Instant.parse(rollbackTimestamps.get(rollbackId)).plusMillis(
+                                offset);
+                updatedRollbackTimestamps.put(rollbackId, updatedTimestamp.toString());
+            }
+            CrashRecoveryUtils.writeAllKeyValues(mRollbackTimestampsFile,
+                    updatedRollbackTimestamps);
+        }
+    }
+
+    @VisibleForTesting
+    @AnyThread
+    long getBootTimestamp() {
+        return mBootTimestamp;
+    }
+
+    @VisibleForTesting
+    long updateBootTimestamp() {
+        mBootTimestamp = System.currentTimeMillis() - SystemClock.elapsedRealtime();
+        return mBootTimestamp;
     }
 }

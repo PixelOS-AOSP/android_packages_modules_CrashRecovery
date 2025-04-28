@@ -43,6 +43,7 @@ java_defaults {
         "framework-system-server-module-defaults",
     ],
     static_libs: [
+        "com.android.crashrecovery.flags-aconfig-java",
         "crashrecovery-statslog",
         "modules-utils-preconditions",
         "modules-utils-backgroundthread",
@@ -67,6 +68,7 @@ java_sdk_library {
     permitted_packages: [
         "com.android.server",
         "android.crashrecovery",
+        "com.android.crashrecovery",
     ],
     apex_available: [
         "com.android.crashrecovery",
@@ -80,6 +82,7 @@ java_sdk_library {
     ],
     aconfig_declarations: [
         "android.crashrecovery.flags-aconfig",
+        "com.android.crashrecovery.flags-aconfig",
     ],
     jarjar_rules: "jarjar-rules.txt",
 }

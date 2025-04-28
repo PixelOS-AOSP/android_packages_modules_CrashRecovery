@@ -102,6 +102,23 @@ public class CrashRecoveryUtils {
         }
     }
 
+    /** Overwrite the content of designated file with input keyValues **/
+    public static void writeAllKeyValues(File file, SparseArray<String> keyValues) {
+        StringBuilder content = new StringBuilder();
+        for (int i = 0; i < keyValues.size(); i++) {
+            int key = keyValues.keyAt(i);
+            String value = keyValues.get(key);
+            content.append(key).append(",").append(value).append(System.lineSeparator());
+        }
+
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            fos.write(content.toString().getBytes());
+        } catch (IOException e) {
+            Log.e(TAG, String.format("Failed to write %s", file.getAbsolutePath()), e);
+            file.delete();
+        }
+    }
+
     public static SparseArray<String> readAllKeyValues(File file) {
         SparseArray<String> result = new SparseArray<>();
         try {
