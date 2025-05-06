@@ -1,0 +1,1 @@
+rule android.crashrecovery.flags.** android.crashrecovery.internal.flags.@1

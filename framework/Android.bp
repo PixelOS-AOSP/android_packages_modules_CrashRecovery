@@ -55,4 +55,5 @@ java_sdk_library {
         "//frameworks/base/tests:__subpackages__",
         "//cts:__subpackages__",
     ],
+    jarjar_rules: "jarjar-rules.txt",
 }

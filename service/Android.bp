@@ -43,7 +43,6 @@ java_defaults {
         "framework-system-server-module-defaults",
     ],
     static_libs: [
-        "android.crashrecovery.flags-aconfig-java",
         "crashrecovery-statslog",
         "modules-utils-preconditions",
         "modules-utils-backgroundthread",
@@ -52,6 +51,7 @@ java_defaults {
         "PlatformProperties",
     ],
     libs: [
+        "android.crashrecovery.flags-aconfig-java",
         "unsupportedappusage",
         "framework-configinfrastructure.stubs.module_lib",
         "framework-crashrecovery.impl",
