@@ -1482,7 +1482,13 @@ public class PackageWatchdog {
                 MonitoredPackage p = packages.get(pIndex);
                 MonitoredPackage existingPackage = getMonitoredPackage(p.getName());
                 if (existingPackage != null) {
-                    existingPackage.updateHealthCheckDuration(p.mDurationMs);
+                    // Reset the state if explicit health check is triggered after the package
+                    // reaches a terminal health state, else only update the health check duration.
+                    if (existingPackage.isPendingHealthChecksLocked()) {
+                        existingPackage.updateHealthCheckDuration(p.mDurationMs);
+                    } else {
+                        existingPackage.resetHealthState(p.mDurationMs);
+                    }
                 } else {
                     putMonitoredPackage(p);
                 }
@@ -1859,6 +1865,19 @@ public class PackageWatchdog {
         @GuardedBy("sLock")
         public void updateHealthCheckDuration(long newDurationMs) {
             mDurationMs = newDurationMs;
+        }
+
+        /**
+         * Explicitly reset the health state of the package to be INACTIVE.
+         *
+         * Note: newDurationMs should be greater than 0 for reset to happen.
+         */
+        @GuardedBy("sLock")
+        public void resetHealthState(long newDurationMs) {
+            updateHealthCheckDuration(newDurationMs);
+            mHasPassedHealthCheck = false;
+            mHealthCheckDurationMs = Long.MAX_VALUE;
+            updateHealthCheckStateLocked();
         }
 
         /**
