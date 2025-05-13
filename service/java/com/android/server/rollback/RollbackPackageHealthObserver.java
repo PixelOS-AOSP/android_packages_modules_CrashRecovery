@@ -18,7 +18,6 @@ package com.android.server.rollback;
 
 import static com.android.server.PackageWatchdog.MITIGATION_RESULT_SUCCESS;
 import static com.android.server.PackageWatchdog.failureReasonToLog;
-import static com.android.server.crashrecovery.CrashRecoveryUtils.logCrashRecoveryEvent;
 
 import android.annotation.AnyThread;
 import android.annotation.FlaggedApi;
@@ -58,15 +57,13 @@ import com.android.server.PackageWatchdog;
 import com.android.server.PackageWatchdog.FailureReasons;
 import com.android.server.PackageWatchdog.PackageHealthObserver;
 import com.android.server.PackageWatchdog.PackageHealthObserverImpact;
+import com.android.server.crashrecovery.CrashRecoveryUtils;
 import com.android.server.crashrecovery.proto.CrashRecoveryStatsLog;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -384,19 +381,8 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
 
     static void writeStagedRollbackId(File file, int stagedRollbackId,
             @Nullable VersionedPackage logPackage) {
-        try {
-            FileOutputStream fos = new FileOutputStream(file, true);
-            PrintWriter pw = new PrintWriter(fos);
-            String logPackageName = logPackage != null ? logPackage.getPackageName() : "";
-            pw.append(String.valueOf(stagedRollbackId)).append(",").append(logPackageName);
-            pw.println();
-            pw.flush();
-            FileUtils.sync(fos);
-            pw.close();
-        } catch (IOException e) {
-            Slog.e(TAG, "Failed to save last staged rollback id", e);
-            file.delete();
-        }
+        String logPackageName = logPackage != null ? logPackage.getPackageName() : "";
+        CrashRecoveryUtils.putKeyValue(file, stagedRollbackId, logPackageName);
     }
 
     @WorkerThread
@@ -410,26 +396,8 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     }
 
     static SparseArray<String> readStagedRollbackIds(File file) {
-        SparseArray<String> result = new SparseArray<>();
-        try {
-            String line;
-            BufferedReader reader = new BufferedReader(new FileReader(file));
-            while ((line = reader.readLine()) != null) {
-                // Each line is of the format: "id,logging_package"
-                String[] values = line.trim().split(",");
-                String rollbackId = values[0];
-                String logPackageName = "";
-                if (values.length > 1) {
-                    logPackageName = values[1];
-                }
-                result.put(Integer.parseInt(rollbackId), logPackageName);
-            }
-        } catch (Exception ignore) {
-            return new SparseArray<>();
-        }
-        return result;
+        return CrashRecoveryUtils.readAllKeyValues(file);
     }
-
 
     /**
      * Returns true if the package name is the name of a module.
@@ -466,8 +434,9 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         Slog.i(TAG, "Rolling back package. RollbackId: " + rollback.getRollbackId()
                 + " failedPackage: " + failedPackageName
                 + " rollbackReason: " + failureReasonToLog(rollbackReason));
-        logCrashRecoveryEvent(Log.DEBUG, String.format("Rolling back %s. Reason: %s",
-                failedPackageName, failureReasonToLog(rollbackReason)));
+        CrashRecoveryUtils.logCrashRecoveryEvent(Log.DEBUG,
+                String.format("Rolling back %s. Reason: %s", failedPackageName,
+                        failureReasonToLog(rollbackReason)));
         final RollbackManager rollbackManager = mContext.getSystemService(RollbackManager.class);
         int reasonToLog = WatchdogRollbackLogger.mapFailureReasonToMetric(rollbackReason);
 
@@ -651,7 +620,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         }
 
         Slog.i(TAG, "Rolling back all available low impact rollbacks due to " + failedPackageName);
-        logCrashRecoveryEvent(Log.DEBUG,
+        CrashRecoveryUtils.logCrashRecoveryEvent(Log.DEBUG,
                 "Rolling back all available. Reason: " + failureReasonToLog(rollbackReason));
         // Add all rollback ids to mPendingStagedRollbackIds, so that we do not reboot before all
         // pending staged rollbacks are handled.
