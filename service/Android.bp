@@ -49,6 +49,7 @@ java_defaults {
         "modules-utils-backgroundthread",
         "modules-utils-binary-xml",
         "modules-utils-fastxmlserializer",
+        "modules-utils-handlerexecutor",
         "PlatformProperties",
     ],
     libs: [
