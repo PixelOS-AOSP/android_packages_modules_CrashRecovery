@@ -27,7 +27,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.VersionedPackage;
-import android.crashrecovery.flags.Flags;
+import com.android.crashrecovery.flags.Flags;
 import android.os.Build;
 import android.os.PowerManager;
 import android.os.RecoverySystem;
