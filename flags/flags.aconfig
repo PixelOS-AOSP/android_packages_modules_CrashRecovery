@@ -7,3 +7,10 @@ flag {
     description: "Individually configure rollbacks availability for RollbackPackageHealthObserver to 14 days."
     bug: "416259905"
 }
+
+flag {
+    name: "synchronous_reboot_in_rescue_party"
+    namespace: "modularization"
+    description: "Makes reboot and factory reset synchronous in RescueParty"
+    bug: "328203835"
+}
