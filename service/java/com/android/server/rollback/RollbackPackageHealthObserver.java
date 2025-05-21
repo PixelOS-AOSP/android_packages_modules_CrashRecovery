@@ -44,6 +44,7 @@ import android.os.HandlerThread;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import android.provider.DeviceConfig;
 import android.sysprop.CrashRecoveryProperties;
 import android.util.ArraySet;
 import android.util.FileUtils;
@@ -53,6 +54,7 @@ import android.util.SparseArray;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.Preconditions;
+import com.android.modules.utils.HandlerExecutor;
 import com.android.server.PackageWatchdog;
 import com.android.server.PackageWatchdog.FailureReasons;
 import com.android.server.PackageWatchdog.PackageHealthObserver;
@@ -69,6 +71,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -93,12 +96,19 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     private static final String PROP_DISABLE_HIGH_IMPACT_ROLLBACK_FLAG =
             "persist.device_config.configuration.disable_high_impact_rollback";
 
+    private static final String PROP_OBSERVER_ROLLBACK_AVAILABILITY_MILLIS =
+            "observer_rollback_availability_in_millis";
+
     // Rollbacks available for RollbackPackageHealthObserver for the first 14 days.
     private static final long DEFAULT_ROLLBACK_AVAILABILITY_DURATION_MILLIS =
             TimeUnit.DAYS.toMillis(14);
 
+    private long mRollbackAvailabilityDurationInMillis =
+            DEFAULT_ROLLBACK_AVAILABILITY_DURATION_MILLIS;
+
     private final Context mContext;
     private final Handler mHandler;
+    private final Executor mExecutor;
     private final File mLastStagedRollbackIdsFile;
     private final File mTwoPhaseRollbackEnabledFile;
     private final File mRollbackTimestampsFile;
@@ -118,6 +128,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         HandlerThread handlerThread = new HandlerThread("RollbackPackageHealthObserver");
         handlerThread.start();
         mHandler = new Handler(handlerThread.getLooper());
+        mExecutor = new HandlerExecutor(getHandler());
         File dataDir = new File(Environment.getDataDirectory(), "rollback-observer");
         dataDir.mkdirs();
         mLastStagedRollbackIdsFile = new File(dataDir, "last-staged-rollback-ids");
@@ -267,7 +278,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
                 // installing the CrashRecovery version with "rollback-observer/rollback-timestamp".
                 // On the safe side, it should be considered as available rollback.
                 return timestamp == null || Instant.now().isBefore(Instant.parse(timestamp)
-                        .plusMillis(DEFAULT_ROLLBACK_AVAILABILITY_DURATION_MILLIS));
+                        .plusMillis(mRollbackAvailabilityDurationInMillis));
             }).toList();
         }
         return availableRollbacks;
@@ -325,6 +336,20 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         return false;
     }
 
+    @WorkerThread
+    private void updateRollbackAvailabilityDurationInMillis() {
+        assertInWorkerThread();
+        mRollbackAvailabilityDurationInMillis = DeviceConfig.getLong(
+                DeviceConfig.NAMESPACE_ROLLBACK,
+                PROP_OBSERVER_ROLLBACK_AVAILABILITY_MILLIS,
+                DEFAULT_ROLLBACK_AVAILABILITY_DURATION_MILLIS);
+        if (mRollbackAvailabilityDurationInMillis < 0) {
+            mRollbackAvailabilityDurationInMillis = DEFAULT_ROLLBACK_AVAILABILITY_DURATION_MILLIS;
+        }
+        Slog.d(TAG, "mRollbackAvailabilityDurationInMillis=" +
+                mRollbackAvailabilityDurationInMillis);
+    }
+
     /** Verifies the rollback state after a reboot and schedules polling for sometime after reboot
      * to check for native crashes and mitigate them if needed.
      */
@@ -337,6 +362,12 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     private void onBootCompleted() {
         assertInWorkerThread();
 
+        if (com.android.crashrecovery.flags.Flags
+                .configurePackageHealthObserverRollbackTimeout()) {
+            DeviceConfig.addOnPropertiesChangedListener(DeviceConfig.NAMESPACE_ROLLBACK,
+                    mExecutor, properties -> updateRollbackAvailabilityDurationInMillis());
+            updateRollbackAvailabilityDurationInMillis();
+        }
         RollbackManager rollbackManager = mContext.getSystemService(RollbackManager.class);
         if (!getAvailableRollbacks().isEmpty()) {
             // TODO(gavincorkery): Call into Package Watchdog from outside the observer
