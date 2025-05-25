@@ -9,3 +9,5 @@ rule android.util.IndentingPrintWriter com.android.server.crashrecovery.util.Ind
 rule android.util.ArrayUtils com.android.server.crashrecovery.ArrayUtils
 rule android.util.XmlUtils com.android.server.crashrecovery.XmlUtils
 rule android.util.FileUtils com.android.server.crashrecovery.FileUtils
+rule android.aconfig.** com.android.server.crashrecovery.internal.aconfig.Aconfig@1
+rule com.google.protobuf.** com.android.server.crashrecovery.internal.protobuf.@1

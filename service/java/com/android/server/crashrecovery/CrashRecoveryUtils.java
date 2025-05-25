@@ -16,20 +16,39 @@
 
 package com.android.server.crashrecovery;
 
+import static android.aconfig.Aconfig.flag_metadata.flag_storage_backend.DEVICE_CONFIG;
+
+import android.aconfig.Aconfig.parsed_flag;
+import android.aconfig.Aconfig.parsed_flags;
+import android.annotation.Nullable;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.os.Environment;
 import android.util.FileUtils;
 import android.util.IndentingPrintWriter;
 import android.util.Log;
+import android.util.Slog;
 import android.util.SparseArray;
+
+import com.android.internal.annotations.VisibleForTesting;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Class containing helper methods for the CrashRecoveryModule.
@@ -39,7 +58,16 @@ import java.time.ZoneId;
 public class CrashRecoveryUtils {
     private static final String TAG = "CrashRecoveryUtils";
     private static final long MAX_CRITICAL_INFO_DUMP_SIZE = 1000 * 1000; // ~1MB
+    private static final String APEX_ACONFIG_PATH_SUFFIX = "/etc/aconfig_flags.pb";
     private static final Object sFileLock = new Object();
+    private static Set<String> sApkNamespaces =
+            Set.of("com_android_networkstack", "com_android_captiveportallogin");
+
+    @VisibleForTesting
+    protected static final String NETWORK_STACK_CONNECTOR_CLASS =
+            "android.net.INetworkStackConnector";
+
+    @VisibleForTesting protected static String sApexDir = "/apex";
 
     /** Persist recovery related events in crashrecovery events file.**/
     public static void logCrashRecoveryEvent(int priority, String msg) {
@@ -138,5 +166,106 @@ public class CrashRecoveryUtils {
             return new SparseArray<>();
         }
         return result;
+    }
+
+    /**
+     * Scans APEX directory for aconfig_flags.pb files and extracts namespaces from them. Currently
+     * the APK namespaces are hardcoded.
+     *
+     * @return A Set of aconfig namespaces strings present in apexes.
+     */
+    public static Set<String> getFlagNamespacesInModules() {
+        Set<String> moduleNamespaces = new HashSet<>();
+        moduleNamespaces.addAll(sApkNamespaces);
+        List<String> apexProtoPaths = getApexProtoPaths();
+        for (String fileName : apexProtoPaths) {
+            try (FileInputStream inputStream = new FileInputStream(fileName)) {
+                Set<String> namespaces =
+                        parseAconfigNamespacesWithDeviceConfigStorage(inputStream.readAllBytes());
+                moduleNamespaces.addAll(namespaces);
+            } catch (IOException e) {
+                Slog.e(TAG, "failed to read protobuf", e);
+            }
+        }
+        return moduleNamespaces;
+    }
+
+    private static List<String> getApexProtoPaths() {
+        ArrayList<String> paths = new ArrayList<>();
+
+        File apexDirectory = new File(sApexDir);
+        if (!apexDirectory.isDirectory()) {
+            return paths;
+        }
+
+        File[] subdirs = apexDirectory.listFiles();
+        if (subdirs == null) {
+            return paths;
+        }
+
+        for (File prefix : subdirs) {
+            // For each mainline modules, there are two directories, one <modulepackage>/,
+            // and one <modulepackage>@<versioncode>/. Just read the former.
+            if (prefix.getName().contains("@")) {
+                continue;
+            }
+
+            File protoPath = new File(prefix, APEX_ACONFIG_PATH_SUFFIX);
+            if (!protoPath.exists()) {
+                continue;
+            }
+            paths.add(protoPath.getAbsolutePath());
+        }
+        return paths;
+    }
+
+    private static Set<String> parseAconfigNamespacesWithDeviceConfigStorage(byte[] fileContents) {
+        Set<String> namespaces = new HashSet<>();
+        try {
+            parsed_flags parsedFlags = parsed_flags.parseFrom(fileContents);
+            for (parsed_flag flag : parsedFlags.getParsedFlagList()) {
+                if (DEVICE_CONFIG.equals(flag.getMetadata().getStorage())) {
+                    namespaces.add(flag.getNamespace());
+                }
+            }
+        } catch (IOException e) {
+            Slog.e(TAG, "failed to parse protobuf", e);
+        }
+        return namespaces;
+    }
+
+    /**
+     * Finds network service using network stack connector class to get it's package name.
+     *
+     * @return network stack package name if found
+     */
+    @Nullable
+    public static String getNetworkStackPackageName(Context context) {
+        Intent intent = new Intent(NETWORK_STACK_CONNECTOR_CLASS);
+        ComponentName comp = resolveSystemService(intent, context.getPackageManager());
+        if (comp == null) {
+            return null;
+        }
+        return comp.getPackageName();
+    }
+
+    private static ComponentName resolveSystemService(Intent intent, PackageManager pm) {
+        List<ResolveInfo> results = pm.queryIntentServices(intent, 0);
+        ComponentName comp = null;
+        for (int i = 0; i < results.size(); i++) {
+            ResolveInfo ri = results.get(i);
+            if ((ri.serviceInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0) {
+                continue;
+            }
+            ComponentName foundComp =
+                    new ComponentName(
+                            ri.serviceInfo.applicationInfo.packageName, ri.serviceInfo.name);
+            if (comp != null) {
+                Slog.wtf(TAG, "Multiple system services to handle: " + comp + ", " + foundComp);
+                return null;
+            }
+            comp = foundComp;
+        }
+        return comp;
     }
 }
