@@ -27,12 +27,13 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.VersionedPackage;
-import com.android.crashrecovery.flags.Flags;
 import android.os.Build;
 import android.os.PowerManager;
 import android.os.RecoverySystem;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import android.provider.DeviceConfig;
+import android.provider.Settings;
 import android.sysprop.CrashRecoveryProperties;
 import android.text.TextUtils;
 import android.util.EventLog;
@@ -40,16 +41,19 @@ import android.util.FileUtils;
 import android.util.Log;
 import android.util.Slog;
 
+import com.android.crashrecovery.flags.Flags;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.PackageWatchdog.FailureReasons;
 import com.android.server.PackageWatchdog.PackageHealthObserver;
 import com.android.server.PackageWatchdog.PackageHealthObserverImpact;
+import com.android.server.crashrecovery.CrashRecoveryUtils;
 import com.android.server.crashrecovery.proto.CrashRecoveryStatsLog;
 
 import java.io.File;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -123,6 +127,8 @@ public class RescueParty {
     private static final int LOG_TAG_RESCUE_SUCCESS = 2902;
     private static final int LOG_TAG_RESCUE_FAILURE = 2903;
 
+    private static Set<String> sFlagNamespacesToMonitor;
+
     /** Register the Rescue Party observer as a Package Watchdog health observer */
     public static void registerHealthObserver(Context context) {
         PackageWatchdog.getInstance(context).registerHealthObserver(
@@ -163,6 +169,11 @@ public class RescueParty {
         }
 
         return false;
+    }
+
+    @VisibleForTesting
+    protected static boolean isFlagResetEnabled() {
+        return Flags.flagResetEnabled() && !Flags.flagResetDisabled();
     }
 
     /**
@@ -212,9 +223,9 @@ public class RescueParty {
 
     private static int getMaxRescueLevel() {
         if (!SystemProperties.getBoolean(PROP_DISABLE_FACTORY_RESET_FLAG, false)) {
-            return Level.factoryReset();
+            return RESCUE_LEVEL_FACTORY_RESET;
         }
-        return Level.reboot();
+        return RESCUE_LEVEL_WARM_REBOOT;
     }
 
     /**
@@ -225,12 +236,33 @@ public class RescueParty {
      */
     private static @RescueLevels int getRescueLevel(int mitigationCount) {
         if (mitigationCount == 1) {
-            return Level.reboot();
+            return RESCUE_LEVEL_WARM_REBOOT;
         } else if (mitigationCount >= 2) {
-            return Math.min(getMaxRescueLevel(), Level.factoryReset());
+            return Math.min(getMaxRescueLevel(), RESCUE_LEVEL_FACTORY_RESET);
         } else {
-            return Level.none();
+            return RESCUE_LEVEL_NONE;
         }
+    }
+
+    /**
+     * Get the rescue level to perform if this is the n-th attempt at mitigating failure for boot
+     * loop.
+     *
+     * @param mitigationCount the mitigation attempt number (1 = first attempt etc.).
+     * @return the rescue level for the n-th mitigation attempt.
+     */
+    private static @RescueLevels int getRescueLevelForBootLoop(int mitigationCount) {
+        if (!isFlagResetEnabled()) {
+            return getRescueLevel(mitigationCount);
+        }
+        if (mitigationCount == 1) {
+            return RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET;
+        } else if (mitigationCount == 2) {
+            return RESCUE_LEVEL_WARM_REBOOT;
+        } else if (mitigationCount >= 3) {
+            return Math.min(getMaxRescueLevel(), RESCUE_LEVEL_FACTORY_RESET);
+        }
+        return RESCUE_LEVEL_NONE;
     }
 
     private static void executeRescueLevel(Context context, @Nullable String failedPackage,
@@ -257,6 +289,9 @@ public class RescueParty {
             case RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET:
                 break;
             case RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET:
+                if (isFlagResetEnabled()) {
+                    executeDeviceConfigReset();
+                }
                 break;
             case RESCUE_LEVEL_WARM_REBOOT:
                 executeWarmReboot(context, level, failedPackage);
@@ -280,6 +315,13 @@ public class RescueParty {
                 }
                 executeFactoryReset(context, level, failedPackage);
                 break;
+        }
+    }
+
+    private static void executeDeviceConfigReset() {
+        for (String namespace : sFlagNamespacesToMonitor) {
+            Slog.w(TAG, "Resetting flags in namespace " + namespace);
+            DeviceConfig.resetToDefaults(Settings.RESET_MODE_TRUSTED_DEFAULTS, namespace);
         }
     }
 
@@ -406,6 +448,9 @@ public class RescueParty {
 
         private RescuePartyObserver(Context context) {
             mContext = context;
+            if (isFlagResetEnabled()) {
+                sFlagNamespacesToMonitor = CrashRecoveryUtils.getFlagNamespacesInModules();
+            }
         }
 
         /** Creates or gets singleton instance of RescueParty. */
@@ -489,7 +534,7 @@ public class RescueParty {
             if (isDisabled()) {
                 return PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
             }
-            return mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
+            return mapRescueLevelToUserImpact(getRescueLevelForBootLoop(mitigationCount));
         }
 
         @Override
@@ -498,7 +543,7 @@ public class RescueParty {
                 return MITIGATION_RESULT_SKIPPED;
             }
             final int level;
-            level = getRescueLevel(mitigationCount);
+            level = getRescueLevelForBootLoop(mitigationCount);
             executeRescueLevel(mContext, /*failedPackage=*/ null, level);
             return MITIGATION_RESULT_SUCCESS;
         }
@@ -548,20 +593,6 @@ public class RescueParty {
         } catch (Throwable t) {
             Slog.w(TAG, "Failed to determine if device was on USB", t);
             return false;
-        }
-    }
-
-    private static class Level {
-        static int none() {
-            return RESCUE_LEVEL_NONE;
-        }
-
-        static int reboot() {
-            return RESCUE_LEVEL_WARM_REBOOT;
-        }
-
-        static int factoryReset() {
-            return RESCUE_LEVEL_FACTORY_RESET;
         }
     }
 
