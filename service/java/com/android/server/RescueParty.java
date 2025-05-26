@@ -28,6 +28,8 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.VersionedPackage;
 import android.os.Build;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.PowerManager;
 import android.os.RecoverySystem;
 import android.os.SystemClock;
@@ -44,6 +46,7 @@ import android.util.Slog;
 import com.android.crashrecovery.flags.Flags;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.modules.utils.HandlerExecutor;
 import com.android.server.PackageWatchdog.FailureReasons;
 import com.android.server.PackageWatchdog.PackageHealthObserver;
 import com.android.server.PackageWatchdog.PackageHealthObserverImpact;
@@ -53,7 +56,10 @@ import com.android.server.crashrecovery.proto.CrashRecoveryStatsLog;
 import java.io.File;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -125,14 +131,24 @@ public class RescueParty {
      * name translation.
      */
     private static final int LOG_TAG_RESCUE_SUCCESS = 2902;
+
     private static final int LOG_TAG_RESCUE_FAILURE = 2903;
 
     private static Set<String> sFlagNamespacesToMonitor;
 
-    /** Register the Rescue Party observer as a Package Watchdog health observer */
+    /**
+     * Initialize Rescue Party observer, register it as Package Watchdog's Observer. Also add Device
+     * Config listeners for monitoring for required namespaces.
+     *
+     * <p>TODO: b/354112511 - Have a better name for this method.
+     */
     public static void registerHealthObserver(Context context) {
-        PackageWatchdog.getInstance(context).registerHealthObserver(
-                context.getMainExecutor(), RescuePartyObserver.getInstance(context));
+        RescuePartyObserver observer = RescuePartyObserver.getInstance(context);
+        PackageWatchdog.getInstance(context)
+                .registerHealthObserver(context.getMainExecutor(), observer);
+        if (isFlagResetEnabled()) {
+            observer.initializeDeviceConfigMonitoringIfRequiredAsync();
+        }
     }
 
     private static boolean isDisabled() {
@@ -436,20 +452,45 @@ public class RescueParty {
 
     /**
      * Handle mitigation action for package failures. This observer will be register to Package
-     * Watchdog and will receive calls about package failures. This observer is persistent so it
-     * may choose to mitigate failures for packages it has not explicitly asked to observe.
+     * Watchdog and will receive calls about package failures. This observer is persistent so it may
+     * choose to mitigate failures for packages it has not explicitly asked to observe.
      */
     public static class RescuePartyObserver implements PackageHealthObserver {
 
+        @VisibleForTesting
+        protected static final long DEFAULT_OBSERVING_DURATION_MS = TimeUnit.DAYS.toMillis(1);
+
+        @VisibleForTesting
+        protected static final long DEFAULT_HEALTH_CHECK_TRIGGER_DELAY_MS =
+                TimeUnit.MINUTES.toMillis(5);
+
         private final Context mContext;
+        private final Executor mExecutor;
+        private final Runnable mTriggerHealthCheckRunnable = this::performHealthCheck;
+        private List<String> mNetworkStackPackages;
+        @VisibleForTesting protected final Handler mHandler;
 
         @GuardedBy("RescuePartyObserver.class")
         static RescuePartyObserver sRescuePartyObserver;
 
         private RescuePartyObserver(Context context) {
             mContext = context;
+
             if (isFlagResetEnabled()) {
+                HandlerThread handlerThread = new HandlerThread("RescuePartyObserver");
+                handlerThread.start();
+                mHandler = new Handler(handlerThread.getLooper());
+                mExecutor = new HandlerExecutor(mHandler);
                 sFlagNamespacesToMonitor = CrashRecoveryUtils.getFlagNamespacesInModules();
+                String networkPackageName = CrashRecoveryUtils.getNetworkStackPackageName(mContext);
+                if (networkPackageName != null) {
+                    mNetworkStackPackages = Collections.singletonList(networkPackageName);
+                } else {
+                    Slog.wtf(TAG, "Unable to find NetworkPackage for monitoring network health");
+                }
+            } else {
+                mHandler = null;
+                mExecutor = null;
             }
         }
 
@@ -493,11 +534,15 @@ public class RescueParty {
             if (isDisabled()) {
                 return MITIGATION_RESULT_SKIPPED;
             }
-            Slog.i(TAG, "Executing remediation."
-                    + " failedPackage: "
-                    + (failedPackage == null ? null : failedPackage.getPackageName())
-                    + " failureReason: " + failureReason
-                    + " mitigationCount: " + mitigationCount);
+            Slog.i(
+                    TAG,
+                    "Executing remediation."
+                            + " failedPackage: "
+                            + (failedPackage == null ? null : failedPackage.getPackageName())
+                            + " failureReason: "
+                            + failureReason
+                            + " mitigationCount: "
+                            + mitigationCount);
             if (failureReason == PackageWatchdog.FAILURE_REASON_APP_CRASH
                     || failureReason == PackageWatchdog.FAILURE_REASON_APP_NOT_RESPONDING) {
                 final int level;
@@ -505,9 +550,13 @@ public class RescueParty {
                 executeRescueLevel(mContext,
                         failedPackage == null ? null : failedPackage.getPackageName(), level);
                 return MITIGATION_RESULT_SUCCESS;
-            } else {
-                return MITIGATION_RESULT_SKIPPED;
+            } else if (failureReason == PackageWatchdog.FAILURE_REASON_EXPLICIT_HEALTH_CHECK) {
+                if (isFlagResetEnabled()) {
+                    executeDeviceConfigReset();
+                    return MITIGATION_RESULT_SUCCESS;
+                }
             }
+            return MITIGATION_RESULT_SKIPPED;
         }
 
         @Override
@@ -563,6 +612,40 @@ public class RescueParty {
             }
         }
 
+        /**
+         * Asynchronously start monitoring for device config flag updates if network stack has been
+         * found.
+         */
+        public void initializeDeviceConfigMonitoringIfRequiredAsync() {
+            // no need to initialize if we couldn't find network package.
+            if (mNetworkStackPackages == null) {
+                return;
+            }
+            mHandler.post(this::initializeDeviceConfigMonitoring);
+        }
+
+        /** Start monitoring device config for flag updates */
+        @VisibleForTesting
+        protected void initializeDeviceConfigMonitoring() {
+            for (String namespace : sFlagNamespacesToMonitor) {
+                DeviceConfig.addOnPropertiesChangedListener(
+                        namespace, mExecutor, this::onPropertiesUpdated);
+            }
+        }
+
+        /** Triggers explicit health check. */
+        private void performHealthCheck() {
+            PackageWatchdog.getInstance(mContext)
+                    .startExplicitHealthCheck(
+                            mNetworkStackPackages, DEFAULT_OBSERVING_DURATION_MS, this);
+        }
+
+        /** Trigger delayed network health check to optimize for bulk update */
+        private void onPropertiesUpdated(DeviceConfig.Properties properties) {
+            mHandler.removeCallbacks(mTriggerHealthCheckRunnable);
+            mHandler.postDelayed(
+                    mTriggerHealthCheckRunnable, DEFAULT_HEALTH_CHECK_TRIGGER_DELAY_MS);
+        }
     }
 
     /**
