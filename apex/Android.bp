@@ -92,6 +92,10 @@ apex {
     key: "com.android.crashrecovery.key",
     certificate: ":com.android.crashrecovery.certificate",
     manifest: "manifest.json",
+    licenses: [
+        "Android-Apache-2.0",
+        "opensourcerequest",
+    ],
 }
 
 sdk {
