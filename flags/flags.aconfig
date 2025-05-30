@@ -14,3 +14,23 @@ flag {
     description: "Makes reboot and factory reset synchronous in RescueParty"
     bug: "328203835"
 }
+
+# Following two flags would be working together
+# 1. flag_reset_enabled  enabling the feature
+# 2. flag_reset_disabled disabling the feature
+#
+# Note: flag_reset_disabled will never be promoted to next. Do not clean it up.
+
+flag {
+    name: "flag_reset_disabled"
+    namespace: "modularization"
+    description: "Disables flag reset functionality for internal users"
+    bug: "397776123"
+}
+
+flag {
+    name: "flag_reset_enabled"
+    namespace: "modularization"
+    description: "Enables flag reset functionality during crash recovery"
+    bug: "397776123"
+}
