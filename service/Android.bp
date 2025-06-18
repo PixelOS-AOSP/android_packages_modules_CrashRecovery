@@ -41,6 +41,7 @@ java_defaults {
     ],
     defaults: [
         "framework-system-server-module-defaults",
+        "framework-system-server-module-optimize-defaults",
     ],
     static_libs: [
         "PlatformProperties",
