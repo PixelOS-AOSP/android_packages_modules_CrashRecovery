@@ -149,9 +149,8 @@ public class CrashRecoveryUtils {
 
     public static SparseArray<String> readAllKeyValues(File file) {
         SparseArray<String> result = new SparseArray<>();
-        try {
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
-            BufferedReader reader = new BufferedReader(new FileReader(file));
             while ((line = reader.readLine()) != null) {
                 // Each line is of the format: "id,value"
                 String[] values = line.trim().split(",");
