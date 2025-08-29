@@ -78,7 +78,7 @@ public abstract class ExplicitHealthCheckService extends Service {
     /**
      * {@link Bundle} key for a {@link List} of {@link PackageConfig} value.
      *
-     * {@hide}
+     * @hide
      */
     public static final String EXTRA_SUPPORTED_PACKAGES =
             "android.service.watchdog.extra.supported_packages";
@@ -86,7 +86,7 @@ public abstract class ExplicitHealthCheckService extends Service {
     /**
      * {@link Bundle} key for a {@link List} of {@link String} value.
      *
-     * {@hide}
+     * @hide
      */
     public static final String EXTRA_REQUESTED_PACKAGES =
             "android.service.watchdog.extra.requested_packages";
