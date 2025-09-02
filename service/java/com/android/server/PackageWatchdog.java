@@ -1535,7 +1535,8 @@ public class PackageWatchdog {
             if (getMonitoredPackage(packageName) == null && registeredObserver.isPersistent()
                     && registeredObserver.mayObservePackage(packageName)) {
                 putMonitoredPackage(sPackageWatchdog.newMonitoredPackage(
-                        packageName, DEFAULT_OBSERVING_DURATION_MS, false));
+                        packageName, DEFAULT_OBSERVING_DURATION_MS,
+                        /* hasPassedHealthCheck = */ true));
             }
             MonitoredPackage p = getMonitoredPackage(packageName);
             if (p != null) {
