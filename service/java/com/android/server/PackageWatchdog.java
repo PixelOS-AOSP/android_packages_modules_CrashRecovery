@@ -175,11 +175,30 @@ public class PackageWatchdog {
     @VisibleForTesting
     static final long DEFAULT_MITIGATION_WINDOW_MS = TimeUnit.SECONDS.toMillis(5);
 
+    /**
+     * The minimum value that can be returned by any observer.
+     * It represents that no mitigations were available.
+     */
+    public static final int USER_IMPACT_THRESHOLD_NONE =
+            PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
+
+    /**
+     * The mitigation impact beyond which the user will start noticing the mitigations.
+     */
+    public static final int USER_IMPACT_THRESHOLD_MEDIUM =
+            PackageHealthObserverImpact.USER_IMPACT_LEVEL_20;
+
+    /**
+     * The mitigation impact beyond which the user impact is severely high.
+     */
+    public static final int USER_IMPACT_THRESHOLD_HIGH =
+            PackageHealthObserverImpact.USER_IMPACT_LEVEL_71;
+
     // Threshold level at which or above user might experience significant disruption.
     private static final String MAJOR_USER_IMPACT_LEVEL_THRESHOLD =
             "persist.device_config.configuration.major_user_impact_level_threshold";
     private static final int DEFAULT_MAJOR_USER_IMPACT_LEVEL_THRESHOLD =
-            PackageHealthObserverImpact.USER_IMPACT_LEVEL_71;
+            USER_IMPACT_THRESHOLD_HIGH;
 
     // Comma separated list of all packages exempt from user impact level threshold. If a package
     // in the list is crash looping, all the mitigations including factory reset will be performed.
@@ -765,25 +784,6 @@ public class PackageWatchdog {
         int MITIGATION_RESULT_SUCCESS = 1;
         int MITIGATION_RESULT_SKIPPED = 2;
     }
-
-    /**
-     * The minimum value that can be returned by any observer.
-     * It represents that no mitigations were available.
-     */
-    public static final int USER_IMPACT_THRESHOLD_NONE =
-            PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
-
-    /**
-     * The mitigation impact beyond which the user will start noticing the mitigations.
-     */
-    public static final int USER_IMPACT_THRESHOLD_MEDIUM =
-            PackageHealthObserverImpact.USER_IMPACT_LEVEL_20;
-
-    /**
-     * The mitigation impact beyond which the user impact is severely high.
-     */
-    public static final int USER_IMPACT_THRESHOLD_HIGH =
-            PackageHealthObserverImpact.USER_IMPACT_LEVEL_71;
 
     /**
      * Possible severity values of the user impact of a
