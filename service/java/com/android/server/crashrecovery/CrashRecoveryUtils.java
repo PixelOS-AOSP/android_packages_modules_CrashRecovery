@@ -34,6 +34,7 @@ import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
 
+import com.android.crashrecovery.flags.Flags;
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.io.BufferedReader;
@@ -62,6 +63,8 @@ public class CrashRecoveryUtils {
     private static final Object sFileLock = new Object();
     private static Set<String> sApkNamespaces =
             Set.of("com_android_networkstack", "com_android_captiveportallogin");
+    private static Set<String> sDeviceConfigNamespaces =
+            Set.of("computer_control", "machine_learning");
 
     @VisibleForTesting
     protected static final String NETWORK_STACK_CONNECTOR_CLASS =
@@ -168,12 +171,25 @@ public class CrashRecoveryUtils {
     }
 
     /**
+     * Collects the namespaces that needs to be monitored by CrashRecovery.
+     *
+     * @return A Set of device config namespaces that needs to be monitored.
+     */
+    public static Set<String> getFlagNamespacesToMonitor() {
+        Set<String> namespaces = getFlagNamespacesInModules();
+        if (Flags.additionalDeviceConfigNamespaces()) {
+            namespaces.addAll(sDeviceConfigNamespaces);
+        }
+        return namespaces;
+    }
+
+    /**
      * Scans APEX directory for aconfig_flags.pb files and extracts namespaces from them. Currently
      * the APK namespaces are hardcoded.
      *
-     * @return A Set of aconfig namespaces strings present in apexes.
+     * @return A Set of aconfig namespaces strings present in modules.
      */
-    public static Set<String> getFlagNamespacesInModules() {
+    private static Set<String> getFlagNamespacesInModules() {
         Set<String> moduleNamespaces = new HashSet<>();
         moduleNamespaces.addAll(sApkNamespaces);
         List<String> apexProtoPaths = getApexProtoPaths();

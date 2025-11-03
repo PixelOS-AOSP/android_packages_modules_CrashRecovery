@@ -34,3 +34,10 @@ flag {
     description: "Enables flag reset functionality during crash recovery"
     bug: "397776123"
 }
+
+flag {
+    name: "additional_device_config_namespaces"
+    namespace: "modularization"
+    description: "Add computer_control and machine_learning namespaces to be monitored by Rescue party"
+    bug: "450523526"
+}

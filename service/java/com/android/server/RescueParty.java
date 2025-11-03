@@ -134,7 +134,7 @@ public class RescueParty {
 
     private static final int LOG_TAG_RESCUE_FAILURE = 2903;
 
-    private static Set<String> sFlagNamespacesToMonitor;
+    @VisibleForTesting protected static Set<String> sFlagNamespacesToMonitor;
 
     /**
      * Initialize Rescue Party observer, register it as Package Watchdog's Observer. Also add Device
@@ -143,6 +143,9 @@ public class RescueParty {
      * <p>TODO: b/354112511 - Have a better name for this method.
      */
     public static void registerHealthObserver(Context context) {
+        if (isFlagResetEnabled()) {
+            sFlagNamespacesToMonitor = CrashRecoveryUtils.getFlagNamespacesToMonitor();
+        }
         RescuePartyObserver observer = RescuePartyObserver.getInstance(context);
         PackageWatchdog.getInstance(context)
                 .registerHealthObserver(context.getMainExecutor(), observer);
@@ -481,7 +484,6 @@ public class RescueParty {
                 handlerThread.start();
                 mHandler = new Handler(handlerThread.getLooper());
                 mExecutor = new HandlerExecutor(mHandler);
-                sFlagNamespacesToMonitor = CrashRecoveryUtils.getFlagNamespacesInModules();
                 String networkPackageName = CrashRecoveryUtils.getNetworkStackPackageName(mContext);
                 if (networkPackageName != null) {
                     mNetworkStackPackages = Collections.singletonList(networkPackageName);
