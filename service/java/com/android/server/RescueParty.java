@@ -176,8 +176,8 @@ public class RescueParty {
         // We're disabled on userdebug devices connected over USB, since that's
         // a decent signal that someone is actively trying to debug the device,
         // or that it's in a lab environment.
-        if (Build.TYPE.equals("userdebug") && isUsbActive()) {
-            Slog.v(TAG, "Disabled because of active USB connection");
+        if (Build.TYPE.equals("userdebug")) {
+	    Slog.v(TAG, "Disabled because of userdebug builds");
             return true;
         }
 
