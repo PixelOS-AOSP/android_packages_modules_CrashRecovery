@@ -52,12 +52,11 @@ import java.util.function.Consumer;
  * A service to provide packages supporting explicit health checks and route checks to these
  * packages on behalf of the package watchdog.
  *
- * <p>To extend this class, you must declare the service in your manifest file with the
- * {@link android.Manifest.permission#BIND_EXPLICIT_HEALTH_CHECK_SERVICE} permission,
- * and include an intent filter with the {@link #SERVICE_INTERFACE} action. In adddition,
- * your implementation must live in
- * {@link PackageManager#getServicesSystemSharedLibraryPackageName()}.
- * For example:</p>
+ * <p>To extend this class, you must declare the service in your manifest file with the {@link
+ * android.Manifest.permission#BIND_EXPLICIT_HEALTH_CHECK_SERVICE} permission, and include an intent
+ * filter with the {@link #SERVICE_INTERFACE} action. In addition, your implementation must live in
+ * {@link PackageManager#getServicesSystemSharedLibraryPackageName()}. For example:
+ *
  * <pre>
  *     &lt;service android:name=".FooExplicitHealthCheckService"
  *             android:exported="true"
@@ -68,6 +67,7 @@ import java.util.function.Consumer;
  *         &lt;/intent-filter&gt;
  *     &lt;/service&gt;
  * </pre>
+ *
  * @hide
  */
 @SystemApi
@@ -91,9 +91,7 @@ public abstract class ExplicitHealthCheckService extends Service {
     public static final String EXTRA_REQUESTED_PACKAGES =
             "android.service.watchdog.extra.requested_packages";
 
-    /**
-     * {@link Bundle} key for a {@link String} value.
-     */
+    /** {@link Bundle} key for a {@link String} value. */
     @FlaggedApi(Flags.FLAG_ENABLE_CRASHRECOVERY)
     public static final String EXTRA_HEALTH_CHECK_PASSED_PACKAGE =
             "android.service.watchdog.extra.HEALTH_CHECK_PASSED_PACKAGE";
@@ -120,14 +118,14 @@ public abstract class ExplicitHealthCheckService extends Service {
     /**
      * Called when the system requests an explicit health check for {@code packageName}.
      *
-     * <p> When {@code packageName} passes the check, implementors should call
-     * {@link #notifyHealthCheckPassed} to inform the system.
+     * <p>When {@code packageName} passes the check, implementors should call {@link
+     * #notifyHealthCheckPassed} to inform the system.
      *
-     * <p> It could take many hours before a {@code packageName} passes a check and implementors
+     * <p>It could take many hours before a {@code packageName} passes a check and implementors
      * should never drop requests unless {@link onCancel} is called or the service dies.
      *
-     * <p> Requests should not be queued and additional calls while expecting a result for
-     * {@code packageName} should have no effect.
+     * <p>Requests should not be queued and additional calls while expecting a result for {@code
+     * packageName} should have no effect.
      */
     public abstract void onRequestHealthCheck(@NonNull String packageName);
 
@@ -139,20 +137,22 @@ public abstract class ExplicitHealthCheckService extends Service {
 
     /**
      * Called when the system requests for all the packages supporting explicit health checks. The
-     * system may request an explicit health check for any of these packages with
-     * {@link #onRequestHealthCheck}.
+     * system may request an explicit health check for any of these packages with {@link
+     * #onRequestHealthCheck}.
      *
      * @return all packages supporting explicit health checks
      */
-    @NonNull public abstract List<PackageConfig> onGetSupportedPackages();
+    @NonNull
+    public abstract List<PackageConfig> onGetSupportedPackages();
 
     /**
-     * Called when the system requests for all the packages that it has currently requested
-     * an explicit health check for.
+     * Called when the system requests for all the packages that it has currently requested an
+     * explicit health check for.
      *
      * @return all packages expecting an explicit health check result
      */
-    @NonNull public abstract List<String> onGetRequestedPackages();
+    @NonNull
+    public abstract List<String> onGetRequestedPackages();
 
     private final Handler mHandler = Handler.createAsync(Looper.getMainLooper());
     @Nullable private Consumer<Bundle> mHealthCheckResultCallback;
@@ -166,30 +166,30 @@ public abstract class ExplicitHealthCheckService extends Service {
 
     /**
      * Sets a callback to be invoked when an explicit health check passes for a package.
-     * <p>
-     * The callback will receive a {@link Bundle} containing the package name that passed the
+     *
+     * <p>The callback will receive a {@link Bundle} containing the package name that passed the
      * health check, identified by the key {@link #EXTRA_HEALTH_CHECK_PASSED_PACKAGE}.
-     * <p>
-     * <b>Note:</b> This API is primarily intended for testing purposes. Calling this outside of a
-     * test environment will override the default callback mechanism used to notify the system
+     *
+     * <p><b>Note:</b> This API is primarily intended for testing purposes. Calling this outside of
+     * a test environment will override the default callback mechanism used to notify the system
      * about health check results. Use with caution in production code.
      *
      * @param executor The executor on which the callback should be invoked. If {@code null}, the
-     *                 callback will be executed on the main thread.
+     *     callback will be executed on the main thread.
      * @param callback A callback that receives a {@link Bundle} containing the package name that
-     *                 passed the health check.
+     *     passed the health check.
      */
     @FlaggedApi(Flags.FLAG_ENABLE_CRASHRECOVERY)
-    public final void setHealthCheckPassedCallback(@CallbackExecutor @Nullable Executor executor,
-            @Nullable Consumer<Bundle> callback) {
+    public final void setHealthCheckPassedCallback(
+            @CallbackExecutor @Nullable Executor executor, @Nullable Consumer<Bundle> callback) {
         mCallbackExecutor = executor;
         mHealthCheckResultCallback = callback;
     }
 
     private void executeCallback(@NonNull String packageName) {
         if (mHealthCheckResultCallback != null) {
-            Objects.requireNonNull(packageName,
-                    "Package passing explicit health check must be non-null");
+            Objects.requireNonNull(
+                    packageName, "Package passing explicit health check must be non-null");
             Bundle bundle = new Bundle();
             bundle.putString(EXTRA_HEALTH_CHECK_PASSED_PACKAGE, packageName);
             mHealthCheckResultCallback.accept(bundle);
@@ -199,8 +199,8 @@ public abstract class ExplicitHealthCheckService extends Service {
     }
 
     /**
-     * Implementors should call this to notify the system when explicit health check passes
-     * for {@code packageName};
+     * Implementors should call this to notify the system when explicit health check passes for
+     * {@code packageName};
      */
     public final void notifyHealthCheckPassed(@NonNull String packageName) {
         if (mCallbackExecutor != null) {
@@ -211,9 +211,9 @@ public abstract class ExplicitHealthCheckService extends Service {
     }
 
     /**
-     * A PackageConfig contains a package supporting explicit health checks and the
-     * timeout in {@link System#uptimeMillis} across reboots after which health
-     * check requests from clients are failed.
+     * A PackageConfig contains a package supporting explicit health checks and the timeout in
+     * {@link System#uptimeMillis} across reboots after which health check requests from clients are
+     * failed.
      *
      * @hide
      */
@@ -228,16 +228,16 @@ public abstract class ExplicitHealthCheckService extends Service {
          * Creates a new instance.
          *
          * @param packageName the package name
-         * @param durationMillis the duration in milliseconds, must be greater than or
-         * equal to 0. If it is 0, it will use a system default value.
+         * @param healthCheckTimeoutMillis the duration in milliseconds, must be greater than or
+         *     equal to 0. If it is 0, it will use a system default value.
          */
         public PackageConfig(@NonNull String packageName, long healthCheckTimeoutMillis) {
             mPackageName = Preconditions.checkNotNull(packageName);
             if (healthCheckTimeoutMillis == 0) {
                 mHealthCheckTimeoutMillis = DEFAULT_HEALTH_CHECK_TIMEOUT_MILLIS;
             } else {
-                mHealthCheckTimeoutMillis = Preconditions.checkArgumentNonnegative(
-                        healthCheckTimeoutMillis);
+                mHealthCheckTimeoutMillis =
+                        Preconditions.checkArgumentNonnegative(healthCheckTimeoutMillis);
             }
         }
 
@@ -281,8 +281,7 @@ public abstract class ExplicitHealthCheckService extends Service {
             }
 
             PackageConfig otherInfo = (PackageConfig) other;
-            return Objects.equals(otherInfo.getHealthCheckTimeoutMillis(),
-                    mHealthCheckTimeoutMillis)
+            return mHealthCheckTimeoutMillis == otherInfo.getHealthCheckTimeoutMillis()
                     && Objects.equals(otherInfo.getPackageName(), mPackageName);
         }
 
@@ -302,19 +301,19 @@ public abstract class ExplicitHealthCheckService extends Service {
             parcel.writeLong(mHealthCheckTimeoutMillis);
         }
 
-        public static final @NonNull Creator<PackageConfig> CREATOR = new Creator<PackageConfig>() {
-                @Override
-                public PackageConfig createFromParcel(Parcel source) {
-                    return new PackageConfig(source);
-                }
+        public static final @NonNull Creator<PackageConfig> CREATOR =
+                new Creator<PackageConfig>() {
+                    @Override
+                    public PackageConfig createFromParcel(Parcel source) {
+                        return new PackageConfig(source);
+                    }
 
-                @Override
-                public PackageConfig[] newArray(int size) {
-                    return new PackageConfig[size];
-                }
-            };
+                    @Override
+                    public PackageConfig[] newArray(int size) {
+                        return new PackageConfig[size];
+                    }
+                };
     }
-
 
     private class ExplicitHealthCheckServiceWrapper extends IExplicitHealthCheckService.Stub {
         @Override
@@ -334,26 +333,31 @@ public abstract class ExplicitHealthCheckService extends Service {
 
         @Override
         public void getSupportedPackages(RemoteCallback callback) throws RemoteException {
-            mHandler.post(() -> {
-                List<PackageConfig> packages =
-                        ExplicitHealthCheckService.this.onGetSupportedPackages();
-                Objects.requireNonNull(packages, "Supported package list must be non-null");
-                Bundle bundle = new Bundle();
-                bundle.putParcelableArrayList(EXTRA_SUPPORTED_PACKAGES, new ArrayList<>(packages));
-                callback.sendResult(bundle);
-            });
+            mHandler.post(
+                    () -> {
+                        List<PackageConfig> packages =
+                                ExplicitHealthCheckService.this.onGetSupportedPackages();
+                        Objects.requireNonNull(packages, "Supported package list must be non-null");
+                        Bundle bundle = new Bundle();
+                        bundle.putParcelableArrayList(
+                                EXTRA_SUPPORTED_PACKAGES, new ArrayList<>(packages));
+                        callback.sendResult(bundle);
+                    });
         }
 
         @Override
         public void getRequestedPackages(RemoteCallback callback) throws RemoteException {
-            mHandler.post(() -> {
-                List<String> packages =
-                        ExplicitHealthCheckService.this.onGetRequestedPackages();
-                Objects.requireNonNull(packages, "Requested  package list must be non-null");
-                Bundle bundle = new Bundle();
-                bundle.putStringArrayList(EXTRA_REQUESTED_PACKAGES, new ArrayList<>(packages));
-                callback.sendResult(bundle);
-            });
+            mHandler.post(
+                    () -> {
+                        List<String> packages =
+                                ExplicitHealthCheckService.this.onGetRequestedPackages();
+                        Objects.requireNonNull(
+                                packages, "Requested  package list must be non-null");
+                        Bundle bundle = new Bundle();
+                        bundle.putStringArrayList(
+                                EXTRA_REQUESTED_PACKAGES, new ArrayList<>(packages));
+                        callback.sendResult(bundle);
+                    });
         }
     }
 }

@@ -52,9 +52,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 // TODO(b/120598832): Add tests
-/**
- * Controls the connections with {@link ExplicitHealthCheckService}.
- */
+/** Controls the connections with {@link ExplicitHealthCheckService}. */
 class ExplicitHealthCheckController {
     private static final String TAG = "ExplicitHealthCheckController";
     private final Object mLock = new Object();
@@ -65,28 +63,44 @@ class ExplicitHealthCheckController {
     // To prevent deadlocks between the controller and watchdog threads, we have
     // a lock invariant to ALWAYS acquire the PackageWatchdog#mLock before #mLock in this class.
     // It's easier to just NOT hold #mLock when calling into watchdog code on this consumer.
-    @GuardedBy("mLock") @Nullable private Consumer<String> mPassedConsumer;
+    @GuardedBy("mLock")
+    @Nullable
+    private Consumer<String> mPassedConsumer;
+
     // Called everytime after a successful #syncRequest call, so the watchdog can receive packages
     // supporting health checks and update its internal state. In practice, should never be null
     // after it has been #setEnabled.
     // To prevent deadlocks between the controller and watchdog threads, we have
     // a lock invariant to ALWAYS acquire the PackageWatchdog#mLock before #mLock in this class.
     // It's easier to just NOT hold #mLock when calling into watchdog code on this consumer.
-    @GuardedBy("mLock") @Nullable private Consumer<List<PackageConfig>> mSupportedConsumer;
+    @GuardedBy("mLock")
+    @Nullable
+    private Consumer<List<PackageConfig>> mSupportedConsumer;
+
     // Called everytime we need to notify the watchdog to sync requests between itself and the
     // health check service. In practice, should never be null after it has been #setEnabled.
     // To prevent deadlocks between the controller and watchdog threads, we have
     // a lock invariant to ALWAYS acquire the PackageWatchdog#mLock before #mLock in this class.
     // It's easier to just NOT hold #mLock when calling into watchdog code on this runnable.
-    @GuardedBy("mLock") @Nullable private Runnable mNotifySyncRunnable;
+    @GuardedBy("mLock")
+    @Nullable
+    private Runnable mNotifySyncRunnable;
+
     // Actual binder object to the explicit health check service.
-    @GuardedBy("mLock") @Nullable private IExplicitHealthCheckService mRemoteService;
+    @GuardedBy("mLock")
+    @Nullable
+    private IExplicitHealthCheckService mRemoteService;
+
     // Connection to the explicit health check service, necessary to unbind.
     // We should only try to bind if mConnection is null, non-null indicates we
     // are connected or at least connecting.
-    @GuardedBy("mLock") @Nullable private ServiceConnection mConnection;
+    @GuardedBy("mLock")
+    @Nullable
+    private ServiceConnection mConnection;
+
     // Bind state of the explicit health check service.
-    @GuardedBy("mLock") private boolean mEnabled;
+    @GuardedBy("mLock")
+    private boolean mEnabled;
 
     ExplicitHealthCheckController(Context context) {
         mContext = context;
@@ -103,13 +117,16 @@ class ExplicitHealthCheckController {
     /**
      * Sets callbacks to listen to important events from the controller.
      *
-     * <p> Should be called once at initialization before any other calls to the controller to
-     * ensure a happens-before relationship of the set parameters and visibility on other threads.
+     * <p>Should be called once at initialization before any other calls to the controller to ensure
+     * a happens-before relationship of the set parameters and visibility on other threads.
      */
-    public void setCallbacks(Consumer<String> passedConsumer,
-            Consumer<List<PackageConfig>> supportedConsumer, Runnable notifySyncRunnable) {
+    public void setCallbacks(
+            Consumer<String> passedConsumer,
+            Consumer<List<PackageConfig>> supportedConsumer,
+            Runnable notifySyncRunnable) {
         synchronized (mLock) {
-            if (mPassedConsumer != null || mSupportedConsumer != null
+            if (mPassedConsumer != null
+                    || mSupportedConsumer != null
                     || mNotifySyncRunnable != null) {
                 Slog.wtf(TAG, "Resetting health check controller callbacks");
             }
@@ -121,18 +138,18 @@ class ExplicitHealthCheckController {
     }
 
     /**
-     * Calls the health check service to request or cancel packages based on
-     * {@code newRequestedPackages}.
+     * Calls the health check service to request or cancel packages based on {@code
+     * newRequestedPackages}.
      *
-     * <p> Supported packages in {@code newRequestedPackages} that have not been previously
-     * requested will be requested while supported packages not in {@code newRequestedPackages}
-     * but were previously requested will be cancelled.
+     * <p>Supported packages in {@code newRequestedPackages} that have not been previously requested
+     * will be requested while supported packages not in {@code newRequestedPackages} but were
+     * previously requested will be cancelled.
      *
-     * <p> This handles binding and unbinding to the health check service as required.
+     * <p>This handles binding and unbinding to the health check service as required.
      *
-     * <p> Note, calling this may modify {@code newRequestedPackages}.
+     * <p>Note, calling this may modify {@code newRequestedPackages}.
      *
-     * <p> Note, this method is not thread safe, all calls should be serialized.
+     * <p>Note, this method is not thread safe, all calls should be serialized.
      */
     public void syncRequests(Set<String> newRequestedPackages) {
         boolean enabled;
@@ -147,39 +164,47 @@ class ExplicitHealthCheckController {
             return;
         }
 
-        getSupportedPackages(supportedPackageConfigs -> {
-            // Notify the watchdog without lock held
-            mSupportedConsumer.accept(supportedPackageConfigs);
-            getRequestedPackages(previousRequestedPackages -> {
-                synchronized (mLock) {
-                    // Hold lock so requests and cancellations are sent atomically.
-                    // It is important we don't mix requests from multiple threads.
+        getSupportedPackages(
+                supportedPackageConfigs -> {
+                    // Notify the watchdog without lock held
+                    mSupportedConsumer.accept(supportedPackageConfigs);
+                    getRequestedPackages(
+                            previousRequestedPackages -> {
+                                synchronized (mLock) {
+                                    // Hold lock so requests and cancellations are sent atomically.
+                                    // It is important we don't mix requests from multiple threads.
 
-                    Set<String> supportedPackages = new ArraySet<>();
-                    for (PackageConfig config : supportedPackageConfigs) {
-                        supportedPackages.add(config.getPackageName());
-                    }
-                    // Note, this may modify newRequestedPackages
-                    newRequestedPackages.retainAll(supportedPackages);
+                                    Set<String> supportedPackages = new ArraySet<>();
+                                    for (PackageConfig config : supportedPackageConfigs) {
+                                        supportedPackages.add(config.getPackageName());
+                                    }
+                                    // Note, this may modify newRequestedPackages
+                                    newRequestedPackages.retainAll(supportedPackages);
 
-                    // Cancel packages no longer requested
-                    actOnDifference(previousRequestedPackages,
-                            newRequestedPackages, p -> cancel(p));
-                    // Request packages not yet requested
-                    actOnDifference(newRequestedPackages,
-                            previousRequestedPackages, p -> request(p));
+                                    // Cancel packages no longer requested
+                                    actOnDifference(
+                                            previousRequestedPackages,
+                                            newRequestedPackages,
+                                            p -> cancel(p));
+                                    // Request packages not yet requested
+                                    actOnDifference(
+                                            newRequestedPackages,
+                                            previousRequestedPackages,
+                                            p -> request(p));
 
-                    if (newRequestedPackages.isEmpty()) {
-                        Slog.i(TAG, "No more health check requests, unbinding...");
-                        unbindService();
-                        return;
-                    }
-                }
-            });
-        });
+                                    if (newRequestedPackages.isEmpty()) {
+                                        Slog.i(TAG, "No more health check requests, unbinding...");
+                                        unbindService();
+                                        return;
+                                    }
+                                }
+                            });
+                });
     }
 
-    private void actOnDifference(Collection<String> collection1, Collection<String> collection2,
+    private void actOnDifference(
+            Collection<String> collection1,
+            Collection<String> collection2,
             Consumer<String> action) {
         Iterator<String> iterator = collection1.iterator();
         while (iterator.hasNext()) {
@@ -191,9 +216,8 @@ class ExplicitHealthCheckController {
     }
 
     /**
-     * Requests an explicit health check for {@code packageName}.
-     * After this request, the callback registered on {@link #setCallbacks} can receive explicit
-     * health check passed results.
+     * Requests an explicit health check for {@code packageName}. After this request, the callback
+     * registered on {@link #setCallbacks} can receive explicit health check passed results.
      */
     private void request(String packageName) {
         synchronized (mLock) {
@@ -211,9 +235,9 @@ class ExplicitHealthCheckController {
     }
 
     /**
-     * Cancels all explicit health checks for {@code packageName}.
-     * After this request, the callback registered on {@link #setCallbacks} can no longer receive
-     * explicit health check passed results.
+     * Cancels all explicit health checks for {@code packageName}. After this request, the callback
+     * registered on {@link #setCallbacks} can no longer receive explicit health check passed
+     * results.
      */
     private void cancel(String packageName) {
         synchronized (mLock) {
@@ -233,8 +257,8 @@ class ExplicitHealthCheckController {
     }
 
     /**
-     * Returns the packages that we can request explicit health checks for.
-     * The packages will be returned to the {@code consumer}.
+     * Returns the packages that we can request explicit health checks for. The packages will be
+     * returned to the {@code consumer}.
      */
     private void getSupportedPackages(Consumer<List<PackageConfig>> consumer) {
         synchronized (mLock) {
@@ -244,12 +268,20 @@ class ExplicitHealthCheckController {
 
             Slog.d(TAG, "Getting health check supported packages");
             try {
-                mRemoteService.getSupportedPackages(new RemoteCallback(result -> {
-                    List<PackageConfig> packages =
-                            result.getParcelableArrayList(EXTRA_SUPPORTED_PACKAGES, android.service.watchdog.ExplicitHealthCheckService.PackageConfig.class);
-                    Slog.i(TAG, "Explicit health check supported packages " + packages);
-                    consumer.accept(packages);
-                }));
+                mRemoteService.getSupportedPackages(
+                        new RemoteCallback(
+                                result -> {
+                                    List<PackageConfig> packages =
+                                            result.getParcelableArrayList(
+                                                    EXTRA_SUPPORTED_PACKAGES,
+                                                    android.service.watchdog
+                                                            .ExplicitHealthCheckService
+                                                            .PackageConfig.class);
+                                    Slog.i(
+                                            TAG,
+                                            "Explicit health check supported packages " + packages);
+                                    consumer.accept(packages);
+                                }));
             } catch (RemoteException e) {
                 // Request failed, treat as if all observed packages are supported, if any packages
                 // expire during this period, we may incorrectly treat it as failing health checks
@@ -260,8 +292,8 @@ class ExplicitHealthCheckController {
     }
 
     /**
-     * Returns the packages for which health checks are currently in progress.
-     * The packages will be returned to the {@code consumer}.
+     * Returns the packages for which health checks are currently in progress. The packages will be
+     * returned to the {@code consumer}.
      */
     private void getRequestedPackages(Consumer<List<String>> consumer) {
         synchronized (mLock) {
@@ -271,11 +303,16 @@ class ExplicitHealthCheckController {
 
             Slog.d(TAG, "Getting health check requested packages");
             try {
-                mRemoteService.getRequestedPackages(new RemoteCallback(result -> {
-                    List<String> packages = result.getStringArrayList(EXTRA_REQUESTED_PACKAGES);
-                    Slog.i(TAG, "Explicit health check requested packages " + packages);
-                    consumer.accept(packages);
-                }));
+                mRemoteService.getRequestedPackages(
+                        new RemoteCallback(
+                                result -> {
+                                    List<String> packages =
+                                            result.getStringArrayList(EXTRA_REQUESTED_PACKAGES);
+                                    Slog.i(
+                                            TAG,
+                                            "Explicit health check requested packages " + packages);
+                                    consumer.accept(packages);
+                                }));
             } catch (RemoteException e) {
                 // Request failed, treat as if we haven't requested any packages, if any packages
                 // were actually requested, they will not be cancelled now. May be cancelled later
@@ -285,8 +322,8 @@ class ExplicitHealthCheckController {
     }
 
     /**
-     * Binds to the explicit health check service if the controller is enabled and
-     * not already bound.
+     * Binds to the explicit health check service if the controller is enabled and not already
+     * bound.
      */
     private void bindService() {
         synchronized (mLock) {
@@ -308,42 +345,48 @@ class ExplicitHealthCheckController {
 
             Intent intent = new Intent();
             intent.setComponent(component);
-            mConnection = new ServiceConnection() {
-                @Override
-                public void onServiceConnected(ComponentName name, IBinder service) {
-                    Slog.i(TAG, "Explicit health check service is connected " + name);
-                    initState(service);
-                }
+            mConnection =
+                    new ServiceConnection() {
+                        @Override
+                        public void onServiceConnected(ComponentName name, IBinder service) {
+                            Slog.i(TAG, "Explicit health check service is connected " + name);
+                            initState(service);
+                        }
 
-                @Override
-                @MainThread
-                public void onServiceDisconnected(ComponentName name) {
-                    // Service crashed or process was killed, #onServiceConnected will be called.
-                    // Don't need to re-bind.
-                    Slog.i(TAG, "Explicit health check service is disconnected " + name);
-                    synchronized (mLock) {
-                        mRemoteService = null;
-                    }
-                }
+                        @Override
+                        @MainThread
+                        public void onServiceDisconnected(ComponentName name) {
+                            // Service crashed or process was killed, #onServiceConnected will be
+                            // called.
+                            // Don't need to re-bind.
+                            Slog.i(TAG, "Explicit health check service is disconnected " + name);
+                            synchronized (mLock) {
+                                mRemoteService = null;
+                            }
+                        }
 
-                @Override
-                public void onBindingDied(ComponentName name) {
-                    // Application hosting service probably got updated
-                    // Need to re-bind.
-                    Slog.i(TAG, "Explicit health check service binding is dead. Rebind: " + name);
-                    unbindService();
-                    bindService();
-                }
+                        @Override
+                        public void onBindingDied(ComponentName name) {
+                            // Application hosting service probably got updated
+                            // Need to re-bind.
+                            Slog.i(
+                                    TAG,
+                                    "Explicit health check service binding is dead. Rebind: "
+                                            + name);
+                            unbindService();
+                            bindService();
+                        }
 
-                @Override
-                public void onNullBinding(ComponentName name) {
-                    // Should never happen. Service returned null from #onBind.
-                    Slog.wtf(TAG, "Explicit health check service binding is null?? " + name);
-                }
-            };
+                        @Override
+                        public void onNullBinding(ComponentName name) {
+                            // Should never happen. Service returned null from #onBind.
+                            Slog.wtf(
+                                    TAG, "Explicit health check service binding is null?? " + name);
+                        }
+                    };
 
-            mContext.bindServiceAsUser(intent, mConnection,
-                    Context.BIND_AUTO_CREATE, UserHandle.SYSTEM);
+            mContext.bindServiceAsUser(
+                    intent, mConnection, Context.BIND_AUTO_CREATE, UserHandle.SYSTEM);
             Slog.i(TAG, "Explicit health check service is bound");
         }
     }
@@ -364,9 +407,13 @@ class ExplicitHealthCheckController {
     @Nullable
     private ServiceInfo getServiceInfoLocked() {
         final Intent intent = new Intent(ExplicitHealthCheckService.SERVICE_INTERFACE);
-        final ResolveInfo resolveInfo = mContext.getPackageManager().resolveService(intent,
-                PackageManager.GET_SERVICES | PackageManager.GET_META_DATA
-                        |  PackageManager.MATCH_SYSTEM_ONLY);
+        final ResolveInfo resolveInfo =
+                mContext.getPackageManager()
+                        .resolveService(
+                                intent,
+                                PackageManager.GET_SERVICES
+                                        | PackageManager.GET_META_DATA
+                                        | PackageManager.MATCH_SYSTEM_ONLY);
         if (resolveInfo == null || resolveInfo.serviceInfo == null) {
             Slog.w(TAG, "No valid components found.");
             return null;
@@ -383,10 +430,13 @@ class ExplicitHealthCheckController {
         }
 
         final ComponentName name = new ComponentName(serviceInfo.packageName, serviceInfo.name);
-        if (!Manifest.permission.BIND_EXPLICIT_HEALTH_CHECK_SERVICE
-                .equals(serviceInfo.permission)) {
-            Slog.w(TAG, name.flattenToShortString() + " does not require permission "
-                    + Manifest.permission.BIND_EXPLICIT_HEALTH_CHECK_SERVICE);
+        if (!Manifest.permission.BIND_EXPLICIT_HEALTH_CHECK_SERVICE.equals(
+                serviceInfo.permission)) {
+            Slog.w(
+                    TAG,
+                    name.flattenToShortString()
+                            + " does not require permission "
+                            + Manifest.permission.BIND_EXPLICIT_HEALTH_CHECK_SERVICE);
             return null;
         }
         return name;
@@ -402,20 +452,27 @@ class ExplicitHealthCheckController {
             }
             mRemoteService = IExplicitHealthCheckService.Stub.asInterface(service);
             try {
-                mRemoteService.setCallback(new RemoteCallback(result -> {
-                    String packageName = result.getString(EXTRA_HEALTH_CHECK_PASSED_PACKAGE);
-                    if (!TextUtils.isEmpty(packageName)) {
-                        if (mPassedConsumer == null) {
-                            Slog.wtf(TAG, "Health check passed for package " + packageName
-                                    + "but no consumer registered.");
-                        } else {
-                            // Call without lock held
-                            mPassedConsumer.accept(packageName);
-                        }
-                    } else {
-                        Slog.wtf(TAG, "Empty package passed explicit health check?");
-                    }
-                }));
+                mRemoteService.setCallback(
+                        new RemoteCallback(
+                                result -> {
+                                    String packageName =
+                                            result.getString(EXTRA_HEALTH_CHECK_PASSED_PACKAGE);
+                                    if (!TextUtils.isEmpty(packageName)) {
+                                        if (mPassedConsumer == null) {
+                                            Slog.wtf(
+                                                    TAG,
+                                                    "Health check passed for package "
+                                                            + packageName
+                                                            + "but no consumer registered.");
+                                        } else {
+                                            // Call without lock held
+                                            mPassedConsumer.accept(packageName);
+                                        }
+                                    } else {
+                                        Slog.wtf(
+                                                TAG, "Empty package passed explicit health check?");
+                                    }
+                                }));
                 Slog.i(TAG, "Service initialized, syncing requests");
             } catch (RemoteException e) {
                 Slog.wtf(TAG, "Could not setCallback on explicit health check service");
@@ -428,17 +485,16 @@ class ExplicitHealthCheckController {
     /**
      * Prepares the health check service to receive requests.
      *
-     * @return {@code true} if it is ready and we can proceed with a request,
-     * {@code false} otherwise. If it is not ready, and the service is enabled,
-     * we will bind and the request should be automatically attempted later.
+     * @return {@code true} if it is ready and we can proceed with a request, {@code false}
+     *     otherwise. If it is not ready, and the service is enabled, we will bind and the request
+     *     should be automatically attempted later.
      */
     @GuardedBy("mLock")
     private boolean prepareServiceLocked(String action) {
         if (mRemoteService != null && mEnabled) {
             return true;
         }
-        Slog.i(TAG, "Service not ready to " + action
-                + (mEnabled ? ". Binding..." : ". Disabled"));
+        Slog.i(TAG, "Service not ready to " + action + (mEnabled ? ". Binding..." : ". Disabled"));
         if (mEnabled) {
             bindService();
         }

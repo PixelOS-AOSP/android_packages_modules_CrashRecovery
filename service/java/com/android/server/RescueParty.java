@@ -63,53 +63,42 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Utilities to help rescue the system from crash loops. Callers are expected to
- * report boot events and persistent app crashes, and if they happen frequently
- * enough this class will slowly escalate through several rescue operations
- * before finally rebooting and prompting the user if they want to wipe data as
- * a last resort.
+ * Utilities to help rescue the system from crash loops. Callers are expected to report boot events
+ * and persistent app crashes, and if they happen frequently enough this class will slowly escalate
+ * through several rescue operations before finally rebooting and prompting the user if they want to
+ * wipe data as a last resort.
  *
  * @hide
  */
 public class RescueParty {
-    @VisibleForTesting
-    static final String PROP_ENABLE_RESCUE = "persist.sys.enable_rescue";
-    @VisibleForTesting
-    static final int LEVEL_FACTORY_RESET = 5;
-    @VisibleForTesting
-    static final int RESCUE_LEVEL_NONE = 0;
-    @VisibleForTesting
-    static final int RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET = 1;
-    @VisibleForTesting
-    static final int RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET = 2;
-    @VisibleForTesting
-    static final int RESCUE_LEVEL_WARM_REBOOT = 3;
-    @VisibleForTesting
-    static final int RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS = 4;
-    @VisibleForTesting
-    static final int RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES = 5;
-    @VisibleForTesting
-    static final int RESCUE_LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS = 6;
-    @VisibleForTesting
-    static final int RESCUE_LEVEL_FACTORY_RESET = 7;
+    @VisibleForTesting static final String PROP_ENABLE_RESCUE = "persist.sys.enable_rescue";
+    @VisibleForTesting static final int LEVEL_FACTORY_RESET = 5;
+    @VisibleForTesting static final int RESCUE_LEVEL_NONE = 0;
+    @VisibleForTesting static final int RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET = 1;
+    @VisibleForTesting static final int RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET = 2;
+    @VisibleForTesting static final int RESCUE_LEVEL_WARM_REBOOT = 3;
+    @VisibleForTesting static final int RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS = 4;
+    @VisibleForTesting static final int RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES = 5;
+    @VisibleForTesting static final int RESCUE_LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS = 6;
+    @VisibleForTesting static final int RESCUE_LEVEL_FACTORY_RESET = 7;
 
-    @IntDef(prefix = { "RESCUE_LEVEL_" }, value = {
-        RESCUE_LEVEL_NONE,
-        RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET,
-        RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET,
-        RESCUE_LEVEL_WARM_REBOOT,
-        RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS,
-        RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES,
-        RESCUE_LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS,
-        RESCUE_LEVEL_FACTORY_RESET
-    })
+    @IntDef(
+            prefix = {"RESCUE_LEVEL_"},
+            value = {
+                RESCUE_LEVEL_NONE,
+                RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET,
+                RESCUE_LEVEL_ALL_DEVICE_CONFIG_RESET,
+                RESCUE_LEVEL_WARM_REBOOT,
+                RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_DEFAULTS,
+                RESCUE_LEVEL_RESET_SETTINGS_UNTRUSTED_CHANGES,
+                RESCUE_LEVEL_RESET_SETTINGS_TRUSTED_DEFAULTS,
+                RESCUE_LEVEL_FACTORY_RESET
+            })
     @Retention(RetentionPolicy.SOURCE)
     @interface RescueLevels {}
 
-    @VisibleForTesting
-    static final String TAG = "RescueParty";
-    @VisibleForTesting
-    static final long DEFAULT_FACTORY_RESET_THROTTLE_DURATION_MIN = 1440;
+    @VisibleForTesting static final String TAG = "RescueParty";
+    @VisibleForTesting static final long DEFAULT_FACTORY_RESET_THROTTLE_DURATION_MIN = 1440;
 
     private static final String NAME = "rescue-party-observer";
 
@@ -122,8 +111,8 @@ public class RescueParty {
     private static final String PROP_THROTTLE_DURATION_MIN_FLAG =
             "persist.device_config.configuration.rescue_party_throttle_duration_min";
 
-    private static final int PERSISTENT_MASK = ApplicationInfo.FLAG_PERSISTENT
-            | ApplicationInfo.FLAG_SYSTEM;
+    private static final int PERSISTENT_MASK =
+            ApplicationInfo.FLAG_PERSISTENT | ApplicationInfo.FLAG_SYSTEM;
 
     /**
      * EventLog tags used when logging into the event log. Note the values must be sync with
@@ -177,7 +166,7 @@ public class RescueParty {
         // a decent signal that someone is actively trying to debug the device,
         // or that it's in a lab environment.
         if (Build.TYPE.equals("userdebug")) {
-	    Slog.v(TAG, "Disabled because of userdebug builds");
+            Slog.v(TAG, "Disabled because of userdebug builds");
             return true;
         }
 
@@ -196,9 +185,9 @@ public class RescueParty {
     }
 
     /**
-     * Check if we're currently attempting to reboot for a factory reset. This method must
-     * return true if RescueParty tries to reboot early during a boot loop, since the device
-     * will not be fully booted at this time.
+     * Check if we're currently attempting to reboot for a factory reset. This method must return
+     * true if RescueParty tries to reboot early during a boot loop, since the device will not be
+     * fully booted at this time.
      */
     public static boolean isRecoveryTriggeredReboot() {
         return isFactoryResetPropertySet() || isRebootPropertySet();
@@ -223,6 +212,7 @@ public class RescueParty {
     protected static void setFactoryResetProperty(boolean value) {
         CrashRecoveryProperties.attemptingFactoryReset(value);
     }
+
     protected static void setRebootProperty(boolean value) {
         CrashRecoveryProperties.attemptingReboot(value);
     }
@@ -284,8 +274,8 @@ public class RescueParty {
         return RESCUE_LEVEL_NONE;
     }
 
-    private static void executeRescueLevel(Context context, @Nullable String failedPackage,
-            int level) {
+    private static void executeRescueLevel(
+            Context context, @Nullable String failedPackage, int level) {
         Slog.w(TAG, "Attempting rescue level " + levelToString(level));
         try {
             executeRescueLevelInternal(context, level, failedPackage);
@@ -300,10 +290,10 @@ public class RescueParty {
         }
     }
 
-    private static void executeRescueLevelInternal(Context context, @RescueLevels int level,
-            @Nullable String failedPackage) {
-        CrashRecoveryStatsLog.write(CrashRecoveryStatsLog.RESCUE_PARTY_RESET_REPORTED,
-                level, levelToString(level));
+    private static void executeRescueLevelInternal(
+            Context context, @RescueLevels int level, @Nullable String failedPackage) {
+        CrashRecoveryStatsLog.write(
+                CrashRecoveryStatsLog.RESCUE_PARTY_RESET_REPORTED, level, levelToString(level));
         switch (level) {
             case RESCUE_LEVEL_SCOPED_DEVICE_CONFIG_RESET:
                 break;
@@ -344,8 +334,8 @@ public class RescueParty {
         }
     }
 
-    private static void executeWarmReboot(Context context, int level,
-            @Nullable String failedPackage) {
+    private static void executeWarmReboot(
+            Context context, int level, @Nullable String failedPackage) {
         if (shouldThrottleReboot()) {
             return;
         }
@@ -364,23 +354,24 @@ public class RescueParty {
                 logRescueException(level, failedPackage, t);
             }
         } else {
-            Runnable runnable = () -> {
-                try {
-                    PowerManager pm = context.getSystemService(PowerManager.class);
-                    if (pm != null) {
-                        pm.reboot(TAG);
-                    }
-                } catch (Throwable t) {
-                    logRescueException(level, failedPackage, t);
-                }
-            };
+            Runnable runnable =
+                    () -> {
+                        try {
+                            PowerManager pm = context.getSystemService(PowerManager.class);
+                            if (pm != null) {
+                                pm.reboot(TAG);
+                            }
+                        } catch (Throwable t) {
+                            logRescueException(level, failedPackage, t);
+                        }
+                    };
             Thread thread = new Thread(runnable);
             thread.start();
         }
     }
 
-    private static void executeFactoryReset(Context context, int level,
-            @Nullable String failedPackage) {
+    private static void executeFactoryReset(
+            Context context, int level, @Nullable String failedPackage) {
         if (shouldThrottleReboot()) {
             return;
         }
@@ -395,22 +386,22 @@ public class RescueParty {
                 logRescueException(level, failedPackage, t);
             }
         } else {
-            Runnable runnable = new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        RecoverySystem.rebootPromptAndWipeUserData(context,
-                            TAG + "," + failedPackage);
-                    } catch (Throwable t) {
-                        logRescueException(level, failedPackage, t);
-                    }
-                }
-            };
+            Runnable runnable =
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                RecoverySystem.rebootPromptAndWipeUserData(
+                                        context, TAG + "," + failedPackage);
+                            } catch (Throwable t) {
+                                logRescueException(level, failedPackage, t);
+                            }
+                        }
+                    };
             Thread thread = new Thread(runnable);
             thread.start();
         }
     }
-
 
     private static String getCompleteMessage(Throwable t) {
         final StringBuilder builder = new StringBuilder();
@@ -421,8 +412,8 @@ public class RescueParty {
         return builder.toString();
     }
 
-    private static void logRescueException(int level, @Nullable String failedPackageName,
-            Throwable t) {
+    private static void logRescueException(
+            int level, @Nullable String failedPackageName, Throwable t) {
         final String msg = getCompleteMessage(t);
         EventLog.writeEvent(LOG_TAG_RESCUE_FAILURE, level, msg);
         String failureMsg = "Failed rescue level " + levelToString(level);
@@ -514,25 +505,35 @@ public class RescueParty {
         }
 
         @Override
-        public int onHealthCheckFailed(@Nullable VersionedPackage failedPackage,
-                @FailureReasons int failureReason, int mitigationCount) {
+        public int onHealthCheckFailed(
+                @Nullable VersionedPackage failedPackage,
+                @FailureReasons int failureReason,
+                int mitigationCount) {
             int impact = PackageHealthObserverImpact.USER_IMPACT_LEVEL_0;
-            if (!isDisabled() && (failureReason == PackageWatchdog.FAILURE_REASON_APP_CRASH
-                    || failureReason == PackageWatchdog.FAILURE_REASON_APP_NOT_RESPONDING)) {
+            if (!isDisabled()
+                    && (failureReason == PackageWatchdog.FAILURE_REASON_APP_CRASH
+                            || failureReason
+                                    == PackageWatchdog.FAILURE_REASON_APP_NOT_RESPONDING)) {
                 impact = mapRescueLevelToUserImpact(getRescueLevel(mitigationCount));
             }
 
-            Slog.i(TAG, "Checking available remediations for health check failure."
-                    + " failedPackage: "
-                    + (failedPackage == null ? null : failedPackage.getPackageName())
-                    + " failureReason: " + failureReason
-                    + " available impact: " + impact);
+            Slog.i(
+                    TAG,
+                    "Checking available remediations for health check failure."
+                            + " failedPackage: "
+                            + (failedPackage == null ? null : failedPackage.getPackageName())
+                            + " failureReason: "
+                            + failureReason
+                            + " available impact: "
+                            + impact);
             return impact;
         }
 
         @Override
-        public int onExecuteHealthCheckMitigation(@Nullable VersionedPackage failedPackage,
-                @FailureReasons int failureReason, int mitigationCount) {
+        public int onExecuteHealthCheckMitigation(
+                @Nullable VersionedPackage failedPackage,
+                @FailureReasons int failureReason,
+                int mitigationCount) {
             if (isDisabled()) {
                 return MITIGATION_RESULT_SKIPPED;
             }
@@ -549,8 +550,10 @@ public class RescueParty {
                     || failureReason == PackageWatchdog.FAILURE_REASON_APP_NOT_RESPONDING) {
                 final int level;
                 level = getRescueLevel(mitigationCount);
-                executeRescueLevel(mContext,
-                        failedPackage == null ? null : failedPackage.getPackageName(), level);
+                executeRescueLevel(
+                        mContext,
+                        failedPackage == null ? null : failedPackage.getPackageName(),
+                        level);
                 return MITIGATION_RESULT_SUCCESS;
             } else if (failureReason == PackageWatchdog.FAILURE_REASON_EXPLICIT_HEALTH_CHECK) {
                 if (isFlagResetEnabled()) {
@@ -595,7 +598,7 @@ public class RescueParty {
             }
             final int level;
             level = getRescueLevelForBootLoop(mitigationCount);
-            executeRescueLevel(mContext, /*failedPackage=*/ null, level);
+            executeRescueLevel(mContext, /* failedPackage= */ null, level);
             return MITIGATION_RESULT_SUCCESS;
         }
 
@@ -651,20 +654,22 @@ public class RescueParty {
     }
 
     /**
-     * Returns {@code true} if Rescue Party is allowed to attempt a reboot or factory reset.
-     * Will return {@code false} if a factory reset was already offered recently.
+     * Returns {@code true} if Rescue Party is allowed to attempt a reboot or factory reset. Will
+     * return {@code false} if a factory reset was already offered recently.
      */
     private static boolean shouldThrottleReboot() {
         Long lastResetTime = getLastFactoryResetTimeMs();
         long now = System.currentTimeMillis();
-        long throttleDurationMin = SystemProperties.getLong(PROP_THROTTLE_DURATION_MIN_FLAG,
-                DEFAULT_FACTORY_RESET_THROTTLE_DURATION_MIN);
+        long throttleDurationMin =
+                SystemProperties.getLong(
+                        PROP_THROTTLE_DURATION_MIN_FLAG,
+                        DEFAULT_FACTORY_RESET_THROTTLE_DURATION_MIN);
         return now < lastResetTime + TimeUnit.MINUTES.toMillis(throttleDurationMin);
     }
 
     /**
-     * Hacky test to check if the device has an active USB connection, which is
-     * a good proxy for someone doing local development work.
+     * Hacky test to check if the device has an active USB connection, which is a good proxy for
+     * someone doing local development work.
      */
     private static boolean isUsbActive() {
         if (SystemProperties.getBoolean(PROP_VIRTUAL_DEVICE, false)) {
@@ -672,8 +677,9 @@ public class RescueParty {
             return true;
         }
         try {
-            final String state = FileUtils
-                    .readTextFile(new File("/sys/class/android_usb/android0/state"), 128, "");
+            final String state =
+                    FileUtils.readTextFile(
+                            new File("/sys/class/android_usb/android0/state"), 128, "");
             return "CONFIGURED".equals(state.trim());
         } catch (Throwable t) {
             Slog.w(TAG, "Failed to determine if device was on USB", t);

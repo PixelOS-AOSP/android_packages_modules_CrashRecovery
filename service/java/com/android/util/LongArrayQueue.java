@@ -35,6 +35,7 @@ public class LongArrayQueue {
     private long[] newUnpaddedLongArray(int num) {
         return new long[num];
     }
+
     /**
      * Initializes a queue with the given starting capacity.
      *
@@ -50,9 +51,7 @@ public class LongArrayQueue {
         mHead = mTail = 0;
     }
 
-    /**
-     * Initializes a queue with default starting capacity.
-     */
+    /** Initializes a queue with default starting capacity. */
     public LongArrayQueue() {
         this(16);
     }
@@ -76,16 +75,12 @@ public class LongArrayQueue {
         mTail = mSize;
     }
 
-    /**
-     * Returns the number of elements in the queue.
-     */
+    /** Returns the number of elements in the queue. */
     public int size() {
         return mSize;
     }
 
-    /**
-     * Removes all elements from this queue.
-     */
+    /** Removes all elements from this queue. */
     public void clear() {
         mSize = 0;
         mHead = mTail = 0;
@@ -127,13 +122,13 @@ public class LongArrayQueue {
      *
      * @param position the position from the head of the queue.
      * @return the element found at the given position.
-     * @throws IndexOutOfBoundsException if {@code position} < {@code 0} or
-     *                                   {@code position} >= {@link #size()}
+     * @throws IndexOutOfBoundsException if {@code position} < {@code 0} or {@code position} >=
+     *     {@link #size()}
      */
     public long get(int position) {
         if (position < 0 || position >= mSize) {
-            throw new IndexOutOfBoundsException("Index " + position
-                + " not valid for a queue of size " + mSize);
+            throw new IndexOutOfBoundsException(
+                    "Index " + position + " not valid for a queue of size " + mSize);
         }
         final int index = (mHead + position) % mValues.length;
         return mValues[index];
@@ -166,9 +161,7 @@ public class LongArrayQueue {
         return mValues[index];
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
     public String toString() {
         if (mSize <= 0) {

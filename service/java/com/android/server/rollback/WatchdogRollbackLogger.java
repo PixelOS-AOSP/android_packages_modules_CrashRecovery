@@ -51,6 +51,7 @@ import java.util.List;
 
 /**
  * This class handles the logic for logging Watchdog-triggered rollback events.
+ *
  * @hide
  */
 public final class WatchdogRollbackLogger {
@@ -58,8 +59,7 @@ public final class WatchdogRollbackLogger {
 
     private static final String LOGGING_PARENT_KEY = "android.content.pm.LOGGING_PARENT";
 
-    private WatchdogRollbackLogger() {
-    }
+    private WatchdogRollbackLogger() {}
 
     @Nullable
     private static String getLoggingParentName(Context context, @NonNull String packageName) {
@@ -80,13 +80,13 @@ public final class WatchdogRollbackLogger {
     /**
      * Returns the logging parent of a given package if it exists, {@code null} otherwise.
      *
-     * The logging parent is defined by the {@code android.content.pm.LOGGING_PARENT} field in the
-     * metadata of a package's AndroidManifest.xml.
+     * <p>The logging parent is defined by the {@code android.content.pm.LOGGING_PARENT} field in
+     * the metadata of a package's AndroidManifest.xml.
      */
     @VisibleForTesting
     @Nullable
-    static VersionedPackage getLogPackage(Context context,
-            @NonNull VersionedPackage failingPackage) {
+    static VersionedPackage getLogPackage(
+            Context context, @NonNull VersionedPackage failingPackage) {
         String logPackageName;
         VersionedPackage loggingParent;
         logPackageName = getLoggingParentName(context, failingPackage.getPackageName());
@@ -94,15 +94,22 @@ public final class WatchdogRollbackLogger {
             return null;
         }
         try {
-            loggingParent = new VersionedPackage(logPackageName, context.getPackageManager()
-                    .getPackageInfo(logPackageName, 0 /* flags */).getLongVersionCode());
+            loggingParent =
+                    new VersionedPackage(
+                            logPackageName,
+                            context.getPackageManager()
+                                    .getPackageInfo(logPackageName, 0 /* flags */)
+                                    .getLongVersionCode());
         } catch (PackageManager.NameNotFoundException e) {
             return null;
         }
         return loggingParent;
     }
 
-    static void logRollbackStatusOnBoot(Context context, int rollbackId, String logPackageName,
+    static void logRollbackStatusOnBoot(
+            Context context,
+            int rollbackId,
+            String logPackageName,
             List<RollbackInfo> recentlyCommittedRollbacks) {
         PackageInstaller packageInstaller = context.getPackageManager().getPackageInstaller();
 
@@ -139,13 +146,17 @@ public final class WatchdogRollbackLogger {
         }
 
         if (sessionInfo.isStagedSessionApplied()) {
-            logEvent(oldLoggingPackage,
+            logEvent(
+                    oldLoggingPackage,
                     WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_TYPE__ROLLBACK_SUCCESS,
-                    WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_REASON__REASON_UNKNOWN, "");
+                    WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_REASON__REASON_UNKNOWN,
+                    "");
         } else if (sessionInfo.isStagedSessionFailed()) {
-            logEvent(oldLoggingPackage,
+            logEvent(
+                    oldLoggingPackage,
                     WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_TYPE__ROLLBACK_FAILURE,
-                    WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_REASON__REASON_UNKNOWN, "");
+                    WATCHDOG_ROLLBACK_OCCURRED__ROLLBACK_REASON__REASON_UNKNOWN,
+                    "");
         }
     }
 
@@ -157,12 +168,20 @@ public final class WatchdogRollbackLogger {
      * @param rollbackReason the reason Watchdog triggered a rollback, if known.
      * @param failingPackageName the failing package or process which triggered the rollback.
      */
-    public static void logEvent(@Nullable VersionedPackage logPackage, int type,
-            int rollbackReason, @NonNull String failingPackageName) {
-        String logMsg = "Watchdog event occurred with type: " + rollbackTypeToString(type)
-                + " logPackage: " + logPackage
-                + " rollbackReason: " + rollbackReasonToString(rollbackReason)
-                + " failedPackageName: " + failingPackageName;
+    public static void logEvent(
+            @Nullable VersionedPackage logPackage,
+            int type,
+            int rollbackReason,
+            @NonNull String failingPackageName) {
+        String logMsg =
+                "Watchdog event occurred with type: "
+                        + rollbackTypeToString(type)
+                        + " logPackage: "
+                        + logPackage
+                        + " rollbackReason: "
+                        + rollbackReasonToString(rollbackReason)
+                        + " failedPackageName: "
+                        + failingPackageName;
         Slog.i(TAG, logMsg);
         if (logPackage != null) {
             CrashRecoveryStatsLog.write(
@@ -172,7 +191,7 @@ public final class WatchdogRollbackLogger {
                     logPackage.getVersionCode(),
                     rollbackReason,
                     failingPackageName,
-                    new byte[]{});
+                    new byte[] {});
         } else {
             // In the case that the log package is null, still log an empty string as an
             // indication that retrieving the logging parent failed.
@@ -183,15 +202,15 @@ public final class WatchdogRollbackLogger {
                     0,
                     rollbackReason,
                     failingPackageName,
-                    new byte[]{});
+                    new byte[] {});
         }
 
         logTestProperties(logMsg);
     }
 
     /**
-     * Writes properties which will be used by rollback tests to check if particular rollback
-     * events have occurred.
+     * Writes properties which will be used by rollback tests to check if particular rollback events
+     * have occurred.
      */
     private static void logTestProperties(String logMsg) {
         // This property should be on only during the tests

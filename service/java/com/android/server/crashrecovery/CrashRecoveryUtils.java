@@ -72,7 +72,7 @@ public class CrashRecoveryUtils {
 
     @VisibleForTesting protected static String sApexDir = "/apex";
 
-    /** Persist recovery related events in crashrecovery events file.**/
+    /** Persist recovery related events in crashrecovery events file. */
     public static void logCrashRecoveryEvent(int priority, String msg) {
         Log.println(priority, TAG, msg);
         try {
@@ -89,7 +89,7 @@ public class CrashRecoveryUtils {
         }
     }
 
-    /** Dump recovery related events from crashrecovery events file.**/
+    /** Dump recovery related events from crashrecovery events file. */
     public static void dumpCrashRecoveryEvents(IndentingPrintWriter pw) {
         pw.println("CrashRecovery Events: ");
         pw.increaseIndent();
@@ -116,7 +116,7 @@ public class CrashRecoveryUtils {
         return new File(systemDir, "crashrecovery-events.txt");
     }
 
-    /** Append "key,value" into designated file **/
+    /** Append "key,value" into designated file */
     public static void putKeyValue(File file, int key, String value) {
         try {
             FileOutputStream fos = new FileOutputStream(file, true);
@@ -127,13 +127,17 @@ public class CrashRecoveryUtils {
             FileUtils.sync(fos);
             pw.close();
         } catch (IOException e) {
-            Log.e(TAG, String.format("Failed to save id %s, value %s into %s", key, value,
-                    file.getAbsolutePath()), e);
+            Log.e(
+                    TAG,
+                    String.format(
+                            "Failed to save id %s, value %s into %s",
+                            key, value, file.getAbsolutePath()),
+                    e);
             file.delete();
         }
     }
 
-    /** Overwrite the content of designated file with input keyValues **/
+    /** Overwrite the content of designated file with input keyValues */
     public static void writeAllKeyValues(File file, SparseArray<String> keyValues) {
         StringBuilder content = new StringBuilder();
         for (int i = 0; i < keyValues.size(); i++) {
