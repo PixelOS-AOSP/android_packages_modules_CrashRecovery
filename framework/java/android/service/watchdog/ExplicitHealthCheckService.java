@@ -131,7 +131,7 @@ public abstract class ExplicitHealthCheckService extends Service {
 
     /**
      * Called when the system cancels the explicit health check request for {@code packageName}.
-     * Should do nothing if there are is no active request for {@code packageName}.
+     * Should do nothing if there is no active request for {@code packageName}.
      */
     public abstract void onCancelHealthCheck(@NonNull String packageName);
 
@@ -352,7 +352,7 @@ public abstract class ExplicitHealthCheckService extends Service {
                         List<String> packages =
                                 ExplicitHealthCheckService.this.onGetRequestedPackages();
                         Objects.requireNonNull(
-                                packages, "Requested  package list must be non-null");
+                                packages, "Requested package list must be non-null");
                         Bundle bundle = new Bundle();
                         bundle.putStringArrayList(
                                 EXTRA_REQUESTED_PACKAGES, new ArrayList<>(packages));
