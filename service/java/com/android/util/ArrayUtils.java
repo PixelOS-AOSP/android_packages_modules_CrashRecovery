@@ -24,18 +24,16 @@ import android.annotation.Nullable;
  * @hide
  */
 public class ArrayUtils {
-    private ArrayUtils() { /* cannot be instantiated */ }
+    private ArrayUtils() {
+        /* cannot be instantiated */
+    }
 
-    /**
-     * Checks if given array is null or has zero elements.
-     */
+    /** Checks if given array is null or has zero elements. */
     public static boolean isEmpty(@Nullable int[] array) {
         return array == null || array.length == 0;
     }
 
-    /**
-     * True if the byte array is null or has length 0.
-     */
+    /** True if the byte array is null or has length 0. */
     public static boolean isEmpty(@Nullable byte[] array) {
         return array == null || array.length == 0;
     }

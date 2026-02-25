@@ -35,15 +35,15 @@ public class FileUtils {
     /**
      * Read a text file into a String, optionally limiting the length.
      *
-     * @param file     to read (will not seek, so things like /proc files are OK)
-     * @param max      length (positive for head, negative of tail, 0 for no limit)
+     * @param file to read (will not seek, so things like /proc files are OK)
+     * @param max length (positive for head, negative of tail, 0 for no limit)
      * @param ellipsis to add of the file was truncated (can be null)
      * @return the contents of the file, possibly truncated
      * @throws IOException if something goes wrong reading the file
      * @hide
      */
-    public static @Nullable String readTextFile(@Nullable File file, @Nullable int max,
-            @Nullable String ellipsis) throws IOException {
+    public static @Nullable String readTextFile(
+            @Nullable File file, int max, @Nullable String ellipsis) throws IOException {
         InputStream input = new FileInputStream(file);
         // wrapping a BufferedInputStream around it because when reading /proc with unbuffered
         // input stream, bytes read not equal to buffer size is not necessarily the correct
@@ -51,7 +51,7 @@ public class FileUtils {
         BufferedInputStream bis = new BufferedInputStream(input);
         try {
             long size = file.length();
-            if (max > 0 || (size > 0 && max == 0)) {  // "head" mode: read the first N bytes
+            if (max > 0 || (size > 0 && max == 0)) { // "head" mode: read the first N bytes
                 if (size > 0 && (max == 0 || size < max)) max = (int) size;
                 byte[] data = new byte[max + 1];
                 int length = bis.read(data);
@@ -59,7 +59,7 @@ public class FileUtils {
                 if (length <= max) return new String(data, 0, length);
                 if (ellipsis == null) return new String(data, 0, max);
                 return new String(data, 0, max) + ellipsis;
-            } else if (max < 0) {  // "tail" mode: keep the last N
+            } else if (max < 0) { // "tail" mode: keep the last N
                 int len;
                 boolean rolled = false;
                 byte[] last = null;
@@ -82,7 +82,7 @@ public class FileUtils {
                 }
                 if (ellipsis == null || !rolled) return new String(last);
                 return ellipsis + new String(last);
-            } else {  // "cat" mode: size unknown, read it all in streaming fashion
+            } else { // "cat" mode: size unknown, read it all in streaming fashion
                 ByteArrayOutputStream contents = new ByteArrayOutputStream();
                 int len;
                 byte[] data = new byte[1024];
@@ -99,8 +99,8 @@ public class FileUtils {
     }
 
     /**
-     * Perform an fsync on the given FileOutputStream. The stream at this
-     * point must be flushed but not yet closed.
+     * Perform an fsync on the given FileOutputStream. The stream at this point must be flushed but
+     * not yet closed.
      *
      * @hide
      */

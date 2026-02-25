@@ -22,8 +22,8 @@ import org.xmlpull.v1.XmlPullParserException;
 import java.io.IOException;
 
 /**
- *  Bits and pieces copied from hidden API of
- *  frameworks/base/core/java/com/android/internal/util/XmlUtils.java
+ * Bits and pieces copied from hidden API of
+ * frameworks/base/core/java/com/android/internal/util/XmlUtils.java
  *
  * @hide
  */
@@ -33,8 +33,7 @@ public class XmlUtils {
     public static final void beginDocument(XmlPullParser parser, String firstElementName)
             throws XmlPullParserException, IOException {
         int type;
-        while ((type = parser.next()) != parser.START_TAG
-            && type != parser.END_DOCUMENT) {
+        while ((type = parser.next()) != parser.START_TAG && type != parser.END_DOCUMENT) {
             // Do nothing
         }
 
@@ -43,22 +42,24 @@ public class XmlUtils {
         }
 
         if (!parser.getName().equals(firstElementName)) {
-            throw new XmlPullParserException("Unexpected start tag: found " + parser.getName()
-                + ", expected " + firstElementName);
+            throw new XmlPullParserException(
+                    "Unexpected start tag: found "
+                            + parser.getName()
+                            + ", expected "
+                            + firstElementName);
         }
     }
 
     /** @hide */
     public static boolean nextElementWithin(XmlPullParser parser, int outerDepth)
             throws IOException, XmlPullParserException {
-        for (;;) {
+        for (; ; ) {
             int type = parser.next();
             if (type == XmlPullParser.END_DOCUMENT
                     || (type == XmlPullParser.END_TAG && parser.getDepth() == outerDepth)) {
                 return false;
             }
-            if (type == XmlPullParser.START_TAG
-                    && parser.getDepth() == outerDepth + 1) {
+            if (type == XmlPullParser.START_TAG && parser.getDepth() == outerDepth + 1) {
                 return true;
             }
         }
