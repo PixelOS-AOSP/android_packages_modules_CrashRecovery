@@ -115,7 +115,7 @@ public class RescueParty {
             ApplicationInfo.FLAG_PERSISTENT | ApplicationInfo.FLAG_SYSTEM;
 
     /**
-     * EventLog tags used when logging into the event log. Note the values must be sync with
+     * EventLog tags used when logging into the event log. Note the values must be in sync with
      * frameworks/base/services/core/java/com/android/server/EventLogTags.logtags to get correct
      * name translation.
      */
@@ -162,11 +162,11 @@ public class RescueParty {
             return true;
         }
 
-        // We're disabled on userdebug devices connected over USB, since that's
-        // a decent signal that someone is actively trying to debug the device,
-        // or that it's in a lab environment.
+        // We're disabled on all userdebug builds, as this is a decent signal
+        // that someone is actively trying to debug the device, or that it's
+        // in a lab environment.
         if (Build.TYPE.equals("userdebug")) {
-            Slog.v(TAG, "Disabled because of userdebug builds");
+            Slog.v(TAG, "Disabled because of userdebug build");
             return true;
         }
 

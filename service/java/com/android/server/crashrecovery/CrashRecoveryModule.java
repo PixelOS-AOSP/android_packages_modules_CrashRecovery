@@ -23,7 +23,7 @@ import com.android.server.RescueParty;
 import com.android.server.SystemService;
 
 /**
- * This class encapsulate the lifecycle methods of CrashRecovery module.
+ * This class encapsulates the lifecycle methods of CrashRecovery module.
  *
  * @hide
  */

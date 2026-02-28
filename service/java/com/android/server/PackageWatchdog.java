@@ -224,7 +224,7 @@ public class PackageWatchdog {
     private static final String METADATA_FILE = "/metadata/watchdog/mitigation_count.txt";
 
     /**
-     * EventLog tags used when logging into the event log. Note the values must be sync with
+     * EventLog tags used when logging into the event log. Note the values must be in sync with
      * frameworks/base/services/core/java/com/android/server/EventLogTags.logtags to get correct
      * name translation.
      */
@@ -245,7 +245,7 @@ public class PackageWatchdog {
 
     // Contains (observer-name -> observer-handle) that have ever been registered from
     // previous boots. Observers with all packages expired are periodically pruned.
-    // It is saved to disk on system shutdown and repouplated on startup so it survives reboots.
+    // It is saved to disk on system shutdown and repopulated on startup so it survives reboots.
     @GuardedBy("sLock")
     private final ArrayMap<String, ObserverInternal> mAllObservers = new ArrayMap<>();
 
@@ -1179,7 +1179,7 @@ public class PackageWatchdog {
     /**
      * Returns the next duration in millis to sync the watchdog state.
      *
-     * @returns Long#MAX_VALUE if there are no observed packages.
+     * @return Long#MAX_VALUE if there are no observed packages.
      */
     @GuardedBy("sLock")
     private long getNextStateSyncMillisLocked() {
