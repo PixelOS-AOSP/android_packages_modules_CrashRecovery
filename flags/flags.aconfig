@@ -1,12 +1,6 @@
 package: "com.android.crashrecovery.flags"
 container: "com.android.crashrecovery"
 
-flag {
-    name: "configure_package_health_observer_rollback_timeout"
-    namespace: "modularization"
-    description: "Individually configure rollbacks availability for RollbackPackageHealthObserver to 14 days."
-    bug: "416259905"
-}
 
 flag {
     name: "synchronous_reboot_in_rescue_party"
