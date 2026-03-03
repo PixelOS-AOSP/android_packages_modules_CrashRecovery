@@ -455,7 +455,7 @@ public class RescueParty {
         protected static final long DEFAULT_OBSERVING_DURATION_MS = TimeUnit.DAYS.toMillis(1);
 
         @VisibleForTesting
-        protected static final long DEFAULT_HEALTH_CHECK_TRIGGER_DELAY_MS =
+        protected static long DEFAULT_HEALTH_CHECK_TRIGGER_DELAY_MS =
                 TimeUnit.MINUTES.toMillis(5);
 
         private final Context mContext;
