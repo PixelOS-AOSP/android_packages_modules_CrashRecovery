@@ -150,10 +150,8 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
             writeBoolean(mTwoPhaseRollbackEnabledFile, false);
         }
 
-        if (com.android.crashrecovery.flags.Flags.configurePackageHealthObserverRollbackTimeout()) {
-            getHandler().post(this::updateBootTimestamp);
-            registerTimeChangeReceiver();
-        }
+        getHandler().post(this::updateBootTimestamp);
+        registerTimeChangeReceiver();
     }
 
     private String getFailedPackageName(
@@ -290,31 +288,28 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     List<RollbackInfo> getAvailableRollbacks() {
         final List<RollbackInfo> availableRollbacks =
                 mContext.getSystemService(RollbackManager.class).getAvailableRollbacks();
-        if (com.android.crashrecovery.flags.Flags.configurePackageHealthObserverRollbackTimeout()) {
-            final SparseArray<String> rollbackTimestamps;
-            synchronized (mRollbackTimestampsFileLock) {
-                rollbackTimestamps = CrashRecoveryUtils.readAllKeyValues(mRollbackTimestampsFile);
-            }
-            return availableRollbacks.stream()
-                    .filter(
-                            r -> {
-                                String timestamp = rollbackTimestamps.get(r.getRollbackId());
-                                // If the timestamp cannot be found, it means that such rollback is
-                                // created before installing the CrashRecovery version with
-                                // "rollback-observer/rollback-timestamp".
-                                // On the safe side, it should be considered as available rollback.
-                                if (timestamp == null) {
-                                    return true;
-                                }
-                                Instant rollbackTimestamp = Instant.parse(timestamp);
-                                return Instant.now()
-                                        .isBefore(
-                                                rollbackTimestamp.plusMillis(
-                                                        mRollbackAvailabilityDurationInMillis));
-                            })
-                    .toList();
+        final SparseArray<String> rollbackTimestamps;
+        synchronized (mRollbackTimestampsFileLock) {
+            rollbackTimestamps = CrashRecoveryUtils.readAllKeyValues(mRollbackTimestampsFile);
         }
-        return availableRollbacks;
+        return availableRollbacks.stream()
+                .filter(
+                        r -> {
+                            String timestamp = rollbackTimestamps.get(r.getRollbackId());
+                            // If the timestamp cannot be found, it means that such rollback is
+                            // created before installing the CrashRecovery version with
+                            // "rollback-observer/rollback-timestamp".
+                            // On the safe side, it should be considered as available rollback.
+                            if (timestamp == null) {
+                                return true;
+                            }
+                            Instant rollbackTimestamp = Instant.parse(timestamp);
+                            return Instant.now()
+                                    .isBefore(
+                                            rollbackTimestamp.plusMillis(
+                                                    mRollbackAvailabilityDurationInMillis));
+                        })
+                .toList();
     }
 
     private boolean isPersistentSystemApp(@NonNull String packageName) {
@@ -336,10 +331,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     public void notifyRollbackAvailable(@NonNull RollbackInfo rollback) {
         mHandler.post(
                 () -> {
-                    if (com.android.crashrecovery.flags.Flags
-                            .configurePackageHealthObserverRollbackTimeout()) {
-                        recordRollbackTimestamp(rollback, Instant.now());
-                    }
+                    recordRollbackTimestamp(rollback, Instant.now());
                     // Enable two-phase rollback when a rebootless apex rollback is made available.
                     // We assume the rebootless apex is stable and is less likely to be the cause
                     // if native crash doesn't happen before reboot. So we will clear the flag and
@@ -399,13 +391,11 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     private void onBootCompleted() {
         assertInWorkerThread();
 
-        if (com.android.crashrecovery.flags.Flags.configurePackageHealthObserverRollbackTimeout()) {
-            DeviceConfig.addOnPropertiesChangedListener(
-                    DeviceConfig.NAMESPACE_ROLLBACK,
-                    mExecutor,
-                    properties -> updateRollbackAvailabilityDurationInMillis());
-            updateRollbackAvailabilityDurationInMillis();
-        }
+        DeviceConfig.addOnPropertiesChangedListener(
+                DeviceConfig.NAMESPACE_ROLLBACK,
+                mExecutor,
+                properties -> updateRollbackAvailabilityDurationInMillis());
+        updateRollbackAvailabilityDurationInMillis();
         RollbackManager rollbackManager = mContext.getSystemService(RollbackManager.class);
         if (!getAvailableRollbacks().isEmpty()) {
             // TODO(gavincorkery): Call into Package Watchdog from outside the observer
