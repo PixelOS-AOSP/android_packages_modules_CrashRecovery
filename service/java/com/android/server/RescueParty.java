@@ -108,6 +108,10 @@ public class RescueParty {
             "persist.device_config.configuration.disable_rescue_party";
     private static final String PROP_DISABLE_FACTORY_RESET_FLAG =
             "persist.device_config.configuration.disable_rescue_party_factory_reset";
+
+    // Build time read only property which is not touched by disaster recovery mechanism
+    private static final boolean sBuildDisabledFactoryReset =
+            SystemProperties.getBoolean("ro.config.crashrecovery.disable_factory_reset", false);
     private static final String PROP_THROTTLE_DURATION_MIN_FLAG =
             "persist.device_config.configuration.rescue_party_throttle_duration_min";
 
@@ -141,6 +145,7 @@ public class RescueParty {
         if (isFlagResetEnabled()) {
             observer.initializeDeviceConfigMonitoringIfRequiredAsync();
         }
+        Slog.i(TAG, "Factory reset disabled status: " + sBuildDisabledFactoryReset);
     }
 
     private static boolean isDisabled() {
@@ -182,6 +187,12 @@ public class RescueParty {
     @VisibleForTesting
     protected static boolean isFlagResetEnabled() {
         return Flags.flagResetEnabled() && !Flags.flagResetDisabled();
+    }
+
+    @VisibleForTesting
+    protected static boolean isFactoryResetDisabled() {
+        return sBuildDisabledFactoryReset
+                || SystemProperties.getBoolean(PROP_DISABLE_FACTORY_RESET_FLAG, false);
     }
 
     /**
@@ -231,7 +242,7 @@ public class RescueParty {
     }
 
     private static int getMaxRescueLevel() {
-        if (!SystemProperties.getBoolean(PROP_DISABLE_FACTORY_RESET_FLAG, false)) {
+        if (!isFactoryResetDisabled()) {
             return RESCUE_LEVEL_FACTORY_RESET;
         }
         return RESCUE_LEVEL_WARM_REBOOT;
