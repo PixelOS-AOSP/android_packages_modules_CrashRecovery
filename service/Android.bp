@@ -36,7 +36,6 @@ java_defaults {
     name: "service-crashrecovery-shared",
     srcs: [
         ":service-crashrecovery-shared-srcs",
-        ":services-crashrecovery-module-sources",
         "java/**/*.java",
     ],
     defaults: [
@@ -93,4 +92,12 @@ java_sdk_library {
 java_library {
     name: "service-crashrecovery-pre-jarjar",
     defaults: ["service-crashrecovery-shared"],
+}
+
+genrule {
+    name: "statslog-crashrecovery-java-gen",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --java $(out) --module crashrecovery " +
+        "--javaPackage com.android.server.crashrecovery.proto --javaClass CrashRecoveryStatsLog --worksource",
+    out: ["com/android/server/crashrecovery/proto/CrashRecoveryStatsLog.java"],
 }
