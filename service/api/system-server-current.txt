@@ -1,6 +1,5 @@
 // Signature format: 6.0
 // - style=java
-// - flagged-api-inheritance=none
 package com.android.server {
 
   @FlaggedApi("android.crashrecovery.flags.enable_crashrecovery") public class PackageWatchdog {
@@ -24,7 +23,7 @@ package com.android.server {
     field public static final int USER_IMPACT_THRESHOLD_NONE = 0; // 0x0
   }
 
-  public static interface PackageWatchdog.PackageHealthObserver {
+  @FlaggedApi("android.crashrecovery.flags.enable_crashrecovery") public static interface PackageWatchdog.PackageHealthObserver {
     method @NonNull public String getUniqueIdentifier();
     method public default boolean isPersistent();
     method public default boolean mayObservePackage(@NonNull String);
