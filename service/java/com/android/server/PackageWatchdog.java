@@ -368,8 +368,11 @@ public class PackageWatchdog {
 
     /**
      * Registers {@code observer} to listen for package failures. Add a new ObserverInternal for
-     * this observer if it does not already exist. For executing mitigations observers will receive
-     * callback on the given executor.
+     * this observer if it does not already exist.
+     *
+     * TODO: b/354112511 - Find a safe way to use the executors for callbacks.
+     * <p> Note: Currently, the executors are not used.
+     *
      *
      * <p>Observers are expected to call this on boot. It does not specify any packages but it will
      * resume observing any packages requested from a previous boot.
@@ -652,10 +655,9 @@ public class PackageWatchdog {
                 mLastMitigation = mSystemClock.uptimeMillis();
                 registeredObserver = currentObserverToNotify.registeredObserver;
             }
-            currentObserverToNotify.observerExecutor.execute(
-                    () ->
-                            registeredObserver.onExecuteHealthCheckMitigation(
-                                    versionedPackage, failureReason, mitigationCount));
+            // Synchronous call to observer, preventing further system server crashes.
+            registeredObserver.onExecuteHealthCheckMitigation(
+                    versionedPackage, failureReason, mitigationCount);
         }
     }
 
@@ -711,10 +713,8 @@ public class PackageWatchdog {
                             currentObserverToNotify.getBootMitigationCount() + 1;
                     currentObserverToNotify.setBootMitigationCount(currentObserverMitigationCount);
                     saveAllObserversBootMitigationCountToMetadata(METADATA_FILE);
-                    currentObserverToNotify.observerExecutor.execute(
-                            () ->
-                                    registeredObserver.onExecuteBootLoopMitigation(
-                                            currentObserverMitigationCount));
+                    // Synchronous call to observer, preventing further system server crashes.
+                    registeredObserver.onExecuteBootLoopMitigation(currentObserverMitigationCount);
                 }
             }
         }
@@ -1246,13 +1246,10 @@ public class PackageWatchdog {
                                             TAG,
                                             "Explicit health check failed for package "
                                                     + versionedPkg);
-                                    observer.observerExecutor.execute(
-                                            () ->
-                                                    registeredObserver
-                                                            .onExecuteHealthCheckMitigation(
-                                                                    versionedPkg,
-                                                                    failureReason,
-                                                                    1));
+                                    // Synchronous call to observer, preventing further system
+                                    // server crashes.
+                                    registeredObserver.onExecuteHealthCheckMitigation(
+                                            versionedPkg, failureReason, 1);
                                 }
                             }
                         }
