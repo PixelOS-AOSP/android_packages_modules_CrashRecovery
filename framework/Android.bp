@@ -20,8 +20,8 @@ package {
 filegroup {
     name: "framework-crashrecovery-module-sources",
     srcs: [
-        "java/**/*.java",
         "java/**/*.aidl",
+        "java/**/*.java",
     ],
     path: "java",
     visibility: [
@@ -32,9 +32,8 @@ filegroup {
 java_sdk_library {
     name: "framework-crashrecovery",
     srcs: [
-        "java/**/*.java",
         "java/**/*.aidl",
-        ":framework-crashrecovery-sources",
+        "java/**/*.java",
     ],
     apex_available: [
         "com.android.crashrecovery",
@@ -44,16 +43,16 @@ java_sdk_library {
         "modules-utils-preconditions",
     ],
     permitted_packages: [
-        "android.service.watchdog",
         "android.crashrecovery",
+        "android.service.watchdog",
     ],
     defaults: ["framework-module-defaults"],
     min_sdk_version: "36",
     sdk_version: "module_current",
     impl_library_visibility: [
-        "//packages/modules/CrashRecovery:__subpackages__",
-        "//frameworks/base/tests:__subpackages__",
         "//cts:__subpackages__",
+        "//frameworks/base/tests:__subpackages__",
+        "//packages/modules/CrashRecovery:__subpackages__",
     ],
     jarjar_rules: "jarjar-rules.txt",
 }
