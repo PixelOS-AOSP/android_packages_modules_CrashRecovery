@@ -18,12 +18,6 @@ package {
 
 // Encapsulate the contributions made by the com.android.crashrecovery to the bootclasspath.
 bootclasspath_fragment {
-    // This fragment will be enabled using release_crashrecovery_module flag
-    enabled: select(release_flag("RELEASE_CRASHRECOVERY_MODULE"), {
-        true: true,
-        false: false,
-    }),
-
     name: "com.android.crashrecovery-bootclasspath-fragment",
     contents: ["framework-crashrecovery"],
     apex_available: ["com.android.crashrecovery"],
@@ -50,12 +44,6 @@ bootclasspath_fragment {
 
 // Encapsulate the contributions made by the com.android.crashrecovery to the systemserverclasspath.
 systemserverclasspath_fragment {
-    // This fragment will be enabled using release_crashrecovery_module flag
-    enabled: select(release_flag("RELEASE_CRASHRECOVERY_MODULE"), {
-        true: true,
-        false: false,
-    }),
-
     name: "com.android.crashrecovery-systemserverclasspath-fragment",
     contents: ["service-crashrecovery"],
     apex_available: ["com.android.crashrecovery"],
@@ -73,12 +61,6 @@ android_app_certificate {
 }
 
 apex {
-    // This apex will be enabled using release_crashrecovery_module flag
-    enabled: select(release_flag("RELEASE_CRASHRECOVERY_MODULE"), {
-        true: true,
-        false: false,
-    }),
-
     name: "com.android.crashrecovery",
     defaults: ["b-launched-apex-module"],
     bootclasspath_fragments: ["com.android.crashrecovery-bootclasspath-fragment"],
@@ -99,12 +81,6 @@ apex {
 }
 
 sdk {
-    // This sdk will be enabled using release_crashrecovery_module flag
-    enabled: select(release_flag("RELEASE_CRASHRECOVERY_MODULE"), {
-        true: true,
-        false: false,
-    }),
-
     name: "crashrecovery-sdk",
     apexes: ["com.android.crashrecovery"],
 }
